@@ -175,7 +175,8 @@ Bug reports and suggestions are welcome through Issues.
 **Contributors:** [Code8Byte](https://github.com/Code8Byte) (CEO, Mavyware) ·
 [CodeVouz](https://github.com/CodeVouz) (Founder, AutomaEyes) ·
 [Claude](https://github.com/claude) (AI Development Team) ·
-[ChatGPT](https://chatgpt.com) (AI Development Team) ·
+[ChatGPT](https://github.com/openai) (AI Development Team) ·
+[Gemini](https://github.com/gemini) (AI Development Team) ·
 [Dependabot](https://github.com/dependabot[bot]) (dependency updates).
 
 ---

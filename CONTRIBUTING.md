@@ -54,10 +54,22 @@ questions on anything that touches IPC, the `automaeye://` protocol, token
 storage, or the output/execution paths, since those are the parts covered by
 [SECURITY.md](SECURITY.md).
 
+## Preparing a release
+
+A version number is a promise that the installer can be used, not just that
+the source tree compiles. Before a desktop release, update `app/package.json`
+and `app/package-lock.json`, build the Windows installer, and test a clean
+install through launch and one representative inspection or training path.
+
+Publish the installer as a GitHub Release asset, then update the server's
+`app-version.json` with its version, download URL, and short release notes.
+That is what lets installed copies discover the update at startup.
+
 ## Contributors
 
 - [Code8Byte](https://github.com/Code8Byte) — CEO, Mavyware
 - [CodeVouz](https://github.com/CodeVouz) — Founder, AutomaEyes
 - [Claude](https://github.com/claude) — AI Development Team, code changes and PR fixes
-- [ChatGPT](https://chatgpt.com) — AI Development Team, code changes and PR fixes
+- [ChatGPT](https://github.com/openai) — AI Development Team, code changes and PR fixes
+- [Gemini](https://github.com/gemini) — AI Development Team, CodeQL security audits and quality fixes
 - [Dependabot](https://github.com/dependabot[bot]) — automated dependency updates and PR review

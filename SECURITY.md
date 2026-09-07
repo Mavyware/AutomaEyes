@@ -16,11 +16,15 @@ ships.
 
 | Version | Supported |
 |---|---|
-| 0.3.x | Yes |
-| 0.2.x and earlier | No — please update |
+| 0.3.2 | Yes — current release |
+| 0.3.1 and earlier | No — please update |
 
 Only the latest release receives security fixes. The application checks for
 updates on start and will tell you when a newer version is available.
+
+Version 0.3.2 refreshes the dependencies used by the desktop application and
+its training runtime. It does not change the security reporting process or the
+data-handling model described below.
 
 ## Scope
 
