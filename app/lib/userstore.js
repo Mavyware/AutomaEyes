@@ -19,7 +19,21 @@ function readRaw() {
     try {
         const p = statePath();
         if (!fs.existsSync(p)) return {};
-        return JSON.parse(fs.readFileSync(p, 'utf8')) || {};
+        const buf = fs.readFileSync(p);
+        if (safeStorage.isEncryptionAvailable()) {
+            try {
+                return JSON.parse(safeStorage.decryptString(buf)) || {};
+            } catch {
+                // Fall through if stored in legacy plaintext format
+            }
+        }
+        const text = buf.toString('utf8');
+        try {
+            return JSON.parse(text) || {};
+        } catch {
+            const decoded = Buffer.from(text, 'base64').toString('utf8');
+            return JSON.parse(decoded) || {};
+        }
     } catch {
         // Corrupted state isn't a reason for the app to fail to start — just start empty.
         return {};
@@ -29,7 +43,12 @@ function readRaw() {
 function writeRaw(state) {
     const p = statePath();
     fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, JSON.stringify(state, null, 2), 'utf8');
+    const payload = JSON.stringify(state, null, 2);
+    if (safeStorage.isEncryptionAvailable()) {
+        fs.writeFileSync(p, safeStorage.encryptString(payload));
+    } else {
+        fs.writeFileSync(p, Buffer.from(payload, 'utf8').toString('base64'), 'utf8');
+    }
 }
 
 // ---- Website login session ----
