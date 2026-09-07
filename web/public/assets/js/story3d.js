@@ -23,6 +23,7 @@ if (mount && storyEl) {
     init();
   } catch (err) {
     console.warn('AutomaEyes: story 3D unavailable', err);
+  }
 }
 
 function init() {
