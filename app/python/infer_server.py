@@ -124,7 +124,7 @@ def main():
             if ok:
                 out["qr"] = [t for t in texts if t]
         except Exception:
-            pass
+            out["qr"] = []
         try:
             if hasattr(cv2, "barcode"):
                 bd = cv2.barcode.BarcodeDetector()
@@ -132,7 +132,7 @@ def main():
                 if ok:
                     out["barcode"] = [t for t in texts if t]
         except Exception:
-            pass
+            out["barcode"] = []
         return out
 
     def read_text(detections):

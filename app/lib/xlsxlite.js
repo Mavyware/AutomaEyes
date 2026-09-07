@@ -3,7 +3,7 @@
 const AdmZip = require('adm-zip');
 
 function esc(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 function colRef(n) {           // 0 -> A, 25 -> Z, 26 -> AA
     let s = ''; n += 1;

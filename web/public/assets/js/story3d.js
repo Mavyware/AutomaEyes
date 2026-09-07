@@ -23,12 +23,9 @@ if (mount && storyEl) {
     init();
   } catch (err) {
     console.warn('AutomaEyes: story 3D unavailable', err);
-  }
 }
 
 function init() {
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(mount.clientWidth, mount.clientHeight, false);
@@ -263,7 +260,6 @@ function init() {
   }
 
   /* ---------- Scroll -> camera, crossfade, overlays ---------- */
-  let scale = 1;
 
   function update() {
     const rect = storyEl.getBoundingClientRect();

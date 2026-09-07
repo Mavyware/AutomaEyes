@@ -128,7 +128,7 @@ exports.sambung = (dev) => new Promise((selesai) => {
     if (dev.koneksi === 'tcp') {
         const host = String(dev.host || '').trim();
         const porta = parseInt(dev.porta, 10) || 502;
-        if (!host) { selesai({ ok: false, error: 'Alamat IP PLC belum diisi.' }); return; }
+        if (!host || !/^[a-zA-Z0-9.-]+$/.test(host)) { selesai({ ok: false, error: 'Alamat IP PLC tidak valid.' }); return; }
 
         const soket = new net.Socket();
         let sudah = false;

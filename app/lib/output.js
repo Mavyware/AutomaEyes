@@ -53,7 +53,6 @@ exports.record = (project, imageBase64, runResult, cfg) => {
 
     // Append to daily_summary.csv
     const csvPath = path.join(project.dir, 'outputs', 'daily_summary.csv');
-    const isNew = !fs.existsSync(csvPath);
     const stepsStr = runResult.steps.map(s =>
         `${s.modelName || s.label || s.category}:${s.verdict}(${(s.confidence || 0).toFixed(2)})`
     ).join(';');
@@ -62,10 +61,14 @@ exports.record = (project, imageBase64, runResult, cfg) => {
         runResult.finalVerdict, (runResult.totalMS || 0).toFixed(1),
         stepsStr,
     ].join(',') + '\n';
-    if (isNew) {
-        fs.writeFileSync(csvPath, 'date,seq,timestamp,final_verdict,total_ms,steps\n' + row);
-    } else {
-        fs.appendFileSync(csvPath, row);
+    try {
+        fs.writeFileSync(csvPath, 'date,seq,timestamp,final_verdict,total_ms,steps\n' + row, { flag: 'wx' });
+    } catch (e) {
+        if (e.code === 'EEXIST') {
+            fs.appendFileSync(csvPath, row);
+        } else {
+            throw e;
+        }
     }
 
     return { seq, imgPath, metaPath, csvPath };

@@ -6,9 +6,7 @@ Builds a small dataset shaped EXACTLY like what the app produces
 (images/<split>/ + labels/<split>/*.txt + data.yaml), then runs the real
 train.py and evaluate.py - not mocks of them.
 """
-import io
 import json
-import os
 import shutil
 import subprocess
 import sys

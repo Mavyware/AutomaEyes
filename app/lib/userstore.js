@@ -38,7 +38,13 @@ exports.getSession = () => readRaw().session || null;
 
 exports.setSession = (user) => {
     const state = readRaw();
-    state.session = { user, loggedInAt: new Date().toISOString() };
+    const safeUser = user ? {
+        id: typeof user.id === 'number' ? user.id : String(user.id).substring(0, 50),
+        name: String(user.name || '').substring(0, 100),
+        email: String(user.email || '').substring(0, 100),
+        avatar_url: user.avatar_url ? String(user.avatar_url).substring(0, 200) : null
+    } : null;
+    state.session = { user: safeUser, loggedInAt: new Date().toISOString() };
     writeRaw(state);
     return state.session;
 };

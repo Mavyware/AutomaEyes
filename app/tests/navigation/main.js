@@ -15,7 +15,7 @@ async function navGo(halaman) {
     const target = path.join(__dirname, halaman);
     if (!fs.existsSync(target)) return { ok: false, error: 'file not found' };
 
-    let boleh = true;
+    let boleh;
     try {
         boleh = await win.webContents.executeJavaScript(
             'typeof window.bolehTinggalkanHalaman === "function"'
@@ -98,7 +98,7 @@ app.whenReady().then(async () => {
     //        it through, so old pages don't end up locked. ---
     await paksaMuat('kotor-tanpa-penjaga.html');
     await sentuh();
-    r = await navGo('tujuan.html');
+    await navGo('tujuan.html');
     cek(await judul() === 'TUJUAN', '5: page with beforeunload and no guard is still locked');
 
     fs.writeFileSync(path.join(__dirname, 'hasil.json'),

@@ -20,7 +20,6 @@ let inferServer = null; // { child, port }
 // other lines (train/val/test/nc/names). Called before training & eval.
 function syncDataYamlPath(dataYaml, datasetDir) {
     try {
-        if (!fs.existsSync(dataYaml)) return;
         const local = datasetDir.replace(/\\/g, '/');
         const lines = fs.readFileSync(dataYaml, 'utf8').split(/\r?\n/);
         let found = false;
@@ -30,7 +29,9 @@ function syncDataYamlPath(dataYaml, datasetDir) {
         });
         if (!found) fixed.unshift(`path: ${local}`);
         fs.writeFileSync(dataYaml, fixed.join('\n'));
-    } catch (_) { /* non-fatal: let Python report it if it's actually broken */ }
+    } catch (e) {
+        if (e.code !== 'ENOENT') throw e;
+    }
 }
 
 // ---- Persistent YOLO inference SERVER ----

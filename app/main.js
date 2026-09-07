@@ -56,8 +56,12 @@ function loadConfig() {
         const example = path.join(__dirname, 'config.example.yaml');
         if (fs.existsSync(example)) {
             fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
-            fs.writeFileSync(CONFIG_PATH, fs.readFileSync(example, 'utf8'), 'utf8');
-            console.log('[config] config.yaml dibuat dari template di ' + CONFIG_PATH);
+            try {
+                fs.writeFileSync(CONFIG_PATH, fs.readFileSync(example, 'utf8'), { encoding: 'utf8', flag: 'wx' });
+                console.log('[config] config.yaml dibuat dari template di ' + CONFIG_PATH);
+            } catch (e) {
+                if (e.code !== 'EEXIST') throw e;
+            }
         } else {
             throw new Error('config.example.yaml tidak ditemukan di ' + __dirname);
         }

@@ -53,7 +53,7 @@ def device_info():
         import psutil
         info["ram_gb"] = round(psutil.virtual_memory().total / (1024 ** 3), 1)
     except Exception:
-        pass
+        info["ram_gb"] = None
     return info
 
 
@@ -89,7 +89,7 @@ def eval_classify(a, model, names, kelas_app, ds_dir, split, run_dir, stamp):
     #                folder names ALPHABETICALLY, so the model's index isn't
     #                necessarily the same as the app's index. The confusion matrix uses this order.
     if isinstance(kelas_app, dict):
-        kelas_app = [kelas_app[k] for k in sorted(kelas_app, key=lambda x: int(x))]
+        kelas_app = [kelas_app[k] for k in sorted(kelas_app, key=int)]
     kelas_app = list(kelas_app)
     if not kelas_app:
         print("[X] Daftar kelas tidak ditemukan di data.yaml.", flush=True)

@@ -1519,7 +1519,6 @@ function renderAddonRules() {
     const cfg = currentModel.addonConfig || {};
     const exp = Number.isFinite(cfg.countExpected) ? cfg.countExpected : 1;
     const g = cfg.gdt || {};
-    const gm = g.measure || 'diameter';
 
     const blocks = [];
     if (addons.includes('Presence Check')) {
@@ -1687,7 +1686,7 @@ function openGdtCalib() {
 
 function loopCalib() {
     if (!_calib) return;
-    const { canvas, video, ctx } = _calib;
+    const { canvas, video } = _calib;
     const c = canvas.getContext('2d');
     // Samakan buffer canvas dengan resolusi intrinsik video (biar px = px asli capture).
     if (video.videoWidth && canvas.width !== video.videoWidth) {

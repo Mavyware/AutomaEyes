@@ -109,7 +109,7 @@ def main():
             cfg = yaml.safe_load(Path(args.data).read_text(encoding="utf-8")) or {}
             names = cfg.get("names") or []
             if isinstance(names, dict):
-                names = [names[k] for k in sorted(names, key=lambda x: int(x))]
+                names = [names[k] for k in sorted(names, key=int)]
         except Exception as e:
             print(f"[X] Gagal membaca daftar kelas dari data.yaml: {e}", flush=True)
             sys.exit(1)
@@ -142,7 +142,7 @@ def main():
             ctypes.windll.kernel32.GetCurrentProcess(), 0x00004000)
         print("Prioritas proses training: BelowNormal (UI tetap responsif).", flush=True)
     except Exception:
-        pass
+        pass  # ignore
     try:
         import os as _os
         import torch as _torch
@@ -183,7 +183,7 @@ def main():
                 e = int(getattr(trainer, "epoch", 0)) + 1
                 print(f"PROGRESS_EPOCH {e}/{args.epochs}", flush=True)
             except Exception:
-                pass
+                return
         model.add_callback("on_train_epoch_end", on_epoch_end)
 
         # Callback: send per-epoch metrics (after validation) for the UI dashboard.
@@ -210,7 +210,6 @@ def main():
                     # still works; the UI renames them via "task".
                     top1 = _g("metrics/accuracy_top1")
                     top5 = _g("metrics/accuracy_top5")
-                    loss = 0.0
                     try:
                         li = trainer.label_loss_items(trainer.tloss, prefix="train")
                         loss = float(next(iter(li.values()), 0.0))
@@ -233,7 +232,6 @@ def main():
                 map5095 = _g("metrics/mAP50-95(B)")
 
                 # Per-epoch training loss
-                box = cls = dfl = 0.0
                 try:
                     li = trainer.label_loss_items(trainer.tloss, prefix="train")
                     box = float(li.get("train/box_loss", 0.0))
@@ -258,7 +256,7 @@ def main():
                     "valBox": valBox, "valCls": valCls, "valDfl": valDfl,
                 }), flush=True)
             except Exception:
-                pass
+                return
         model.add_callback("on_fit_epoch_end", on_fit_epoch_end)
 
         if do_resume:
