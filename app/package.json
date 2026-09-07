@@ -15,7 +15,8 @@
     "test:annot": "electron tests/annotator",
     "test": "npm run test:sec && npm run test:cls && npm run test:runtime && npm run test:annot && npm run test:nav",
     "test:nav": "electron tests/navigation",
-    "test:sec": "node tests/keamanan.js"
+    "test:sec": "node tests/keamanan.js",
+    "check": "node scripts/check.js"
   },
   "devDependencies": {
     "electron": "^44.2.0",
