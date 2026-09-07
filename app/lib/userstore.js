@@ -10,9 +10,26 @@
 const { app, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 function statePath() {
     return path.join(app.getPath('userData'), 'state.json');
+}
+
+function encryptFallback(text) {
+    const key = crypto.createHash('sha256').update(app.getPath('userData') || 'automaeyes').digest();
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+    return Buffer.concat([iv, encrypted]);
+}
+
+function decryptFallback(buf) {
+    const key = crypto.createHash('sha256').update(app.getPath('userData') || 'automaeyes').digest();
+    const iv = buf.subarray(0, 16);
+    const data = buf.subarray(16);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
 }
 
 function readRaw() {
@@ -24,15 +41,13 @@ function readRaw() {
             try {
                 return JSON.parse(safeStorage.decryptString(buf)) || {};
             } catch {
-                // Fall through if stored in legacy plaintext format
+                // Fall through if encrypted with fallback or plaintext
             }
         }
-        const text = buf.toString('utf8');
         try {
-            return JSON.parse(text) || {};
+            return JSON.parse(decryptFallback(buf)) || {};
         } catch {
-            const decoded = Buffer.from(text, 'base64').toString('utf8');
-            return JSON.parse(decoded) || {};
+            return JSON.parse(buf.toString('utf8')) || {};
         }
     } catch {
         // Corrupted state isn't a reason for the app to fail to start — just start empty.
@@ -47,7 +62,7 @@ function writeRaw(state) {
     if (safeStorage.isEncryptionAvailable()) {
         fs.writeFileSync(p, safeStorage.encryptString(payload));
     } else {
-        fs.writeFileSync(p, Buffer.from(payload, 'utf8').toString('base64'), 'utf8');
+        fs.writeFileSync(p, encryptFallback(payload));
     }
 }
 
