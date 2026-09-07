@@ -53,12 +53,24 @@ defined('MAIL_FROM_ADDRESS') || define('MAIL_FROM_ADDRESS', 'noreply@automaeyes.
 defined('MAIL_FROM_NAME') || define('MAIL_FROM_NAME', APP_NAME);
 
 if (session_status() === PHP_SESSION_NONE) {
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443)
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+
     session_set_cookie_params([
         'lifetime' => 0,
         'path' => '/',
+        'httponly' => true,
+        'secure' => $isSecure,
         'samesite' => 'Lax',
     ]);
     session_start();
+}
+
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
 }
 
 if (file_exists(ROOT_DIR . '/vendor/autoload.php')) {

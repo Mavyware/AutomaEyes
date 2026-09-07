@@ -146,9 +146,33 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
+            sandbox: true,
             webviewTag: false, // not used; disabling it reduces the attack surface
             backgroundThrottling: false, // do NOT throttle the loop/camera when the window is unfocused
         },
+    });
+
+    // Intercept window.open or <a target="_blank">; prevent untrusted popups and open
+    // valid external URLs in the user's default browser instead.
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        let u;
+        try { u = new URL(url); } catch { return { action: 'deny' }; }
+        if (u.protocol === 'http:' || u.protocol === 'https:') {
+            shell.openExternal(u.href);
+        }
+        return { action: 'deny' };
+    });
+
+    // Prevent navigation away from local files inside the Electron window.
+    mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+        let u;
+        try { u = new URL(navigationUrl); } catch { event.preventDefault(); return; }
+        if (u.protocol !== 'file:') {
+            event.preventDefault();
+            if (u.protocol === 'http:' || u.protocol === 'https:') {
+                shell.openExternal(u.href);
+            }
+        }
     });
 
     // A page with unsaved changes installs a canceling beforeunload. In

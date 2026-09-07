@@ -9,7 +9,7 @@
 const assert = require('assert');
 const path = require('path');
 const os = require('os');
-const { bolehDibuka, tanggalSah } = require('../lib/keamanan');
+const { bolehDibuka, tanggalSah, urlEksternalSah } = require('../lib/keamanan');
 
 let gagal = 0;
 function uji(nama, fn) {
@@ -102,6 +102,32 @@ uji('rejects a date with a valid shape but that does not exist', () => {
 uji('rejects other shapes', () => {
     for (const d of ['2026-9-5', '20260905', '', null, undefined, 20260905, {}]) {
         assert.strictEqual(tanggalSah(d), false, JSON.stringify(d) + ' passed');
+    }
+});
+
+console.log('urlEksternalSah');
+
+uji('accepts valid http and https URLs', () => {
+    for (const u of ['https://example.com', 'http://localhost:3000/api', 'https://api.github.com/repos']) {
+        assert.strictEqual(urlEksternalSah(u), true, u + ' rejected');
+    }
+});
+
+uji('rejects dangerous and non-http schemes', () => {
+    for (const u of [
+        'file:///C:/Windows/System32/calc.exe',
+        'javascript:alert(1)',
+        'data:text/html,<script>alert(1)</script>',
+        'ftp://example.com/file',
+        'ms-msdt:/id',
+        '',
+        '   ',
+        null,
+        undefined,
+        123,
+        {},
+    ]) {
+        assert.strictEqual(urlEksternalSah(u), false, JSON.stringify(u) + ' passed');
     }
 });
 

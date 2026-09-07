@@ -13,6 +13,7 @@
 
 const { spawn } = require('child_process');
 const { pythonScript, pythonDir } = require('./paths');
+const { urlEksternalSah } = require('./keamanan');
 
 const BATAS_MS = 5000;
 const PENANDA = '@@CMD@@ ';
@@ -69,6 +70,10 @@ function jalankanPerintah(cmd, arduino, logs) {
         try { arduino.send(String(cmd.data)); } catch (e) { logs.push(`serial_write gagal: ${e.message}`); }
     } else if (cmd.jenis === 'http') {
         logs.push(`http_post(${cmd.url})`);
+        if (!urlEksternalSah(cmd.url)) {
+            logs.push(`http_post ditolak: URL tidak valid atau bukan http/https`);
+            return;
+        }
         try {
             fetch(String(cmd.url), {
                 method: 'POST',

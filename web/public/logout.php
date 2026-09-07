@@ -6,7 +6,10 @@ require __DIR__ . '/../src/bootstrap.php';
 // screen, not the homepage. Only internal paths are accepted — this must
 // never become an open redirect to an external domain.
 $next = (string) ($_GET['next'] ?? '');
-$safeNext = (str_starts_with($next, '/') && !str_starts_with($next, '//')) ? $next : '/';
+$safeNext = '/';
+if ($next !== '' && str_starts_with($next, '/') && !str_starts_with($next, '//') && !str_starts_with($next, '/\\') && !preg_match('/[\r\n\0]/', $next)) {
+    $safeNext = $next;
+}
 
 Auth::logout();
 redirect($safeNext);

@@ -72,7 +72,7 @@ function app_handoff_url(string $redirect, string $token): string
 
 function sanitize_app_redirect(?string $redirect): ?string
 {
-    if (!$redirect) {
+    if (!$redirect || preg_match('/[\r\n\0]/', $redirect)) {
         return null;
     }
     $parts = parse_url($redirect);

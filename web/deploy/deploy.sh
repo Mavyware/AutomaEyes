@@ -53,7 +53,9 @@ FILES=(
     "public/auth/github.php|$REMOTE_PUBLIC/auth"
     "src/lib/OAuth.php|$REMOTE_SRC/lib"
     "src/lib/Auth.php|$REMOTE_SRC/lib"
+    "src/lib/Database.php|$REMOTE_SRC/lib"
     "src/lib/helpers.php|$REMOTE_SRC/lib"
+    "src/.htaccess|$REMOTE_SRC"
 
     # Halaman publik & unduhan
     "public/index.php|$REMOTE_PUBLIC"

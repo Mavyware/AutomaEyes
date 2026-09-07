@@ -20,6 +20,7 @@
 // their own machine, the same trust model as an Excel macro.
 
 const vm = require('node:vm');
+const { urlEksternalSah } = require('./keamanan');
 
 const SCRIPT_TIMEOUT_MS = 5000;
 
@@ -32,6 +33,10 @@ function buildSandbox(arduino, logs) {
         },
         http_post: (url, body) => {
             logs.push(`http_post(${url})`);
+            if (!urlEksternalSah(url)) {
+                logs.push(`http_post ditolak: URL tidak valid atau bukan http/https`);
+                return;
+            }
             try {
                 fetch(String(url), {
                     method: 'POST',

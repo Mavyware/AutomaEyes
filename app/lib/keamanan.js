@@ -78,4 +78,14 @@ function tanggalSah(d) {
     return t.getUTCFullYear() === th && t.getUTCMonth() === bl - 1 && t.getUTCDate() === tg;
 }
 
-module.exports = { bolehDibuka, tanggalSah, EKSTENSI_DAPAT_DIEKSEKUSI };
+function urlEksternalSah(url) {
+    if (typeof url !== 'string' || !url.trim()) return false;
+    try {
+        const u = new URL(url);
+        return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+module.exports = { bolehDibuka, tanggalSah, urlEksternalSah, EKSTENSI_DAPAT_DIEKSEKUSI };
