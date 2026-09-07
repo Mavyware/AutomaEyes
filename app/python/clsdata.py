@@ -67,6 +67,7 @@ def _kelas_gambar(lbl_path):
             return int(float(baris.split()[0]))
     except Exception:
         return None
+    return None
 
 
 def build(ds_dir, names, out_dir=None, log=print):

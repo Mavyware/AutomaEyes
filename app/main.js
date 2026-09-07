@@ -49,21 +49,16 @@ const CONFIG_PATH = app.isPackaged
     : path.join(__dirname, 'config.yaml');
 
 function loadConfig() {
-    if (!fs.existsSync(CONFIG_PATH)) {
-        // The template is bundled inside the asar. Reading it is fine; what's
-        // not allowed is writing to it. It's read then written to a writable
-        // destination - copyFileSync across asar isn't always supported.
-        const example = path.join(__dirname, 'config.example.yaml');
-        if (fs.existsSync(example)) {
-            fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
-            try {
-                fs.writeFileSync(CONFIG_PATH, fs.readFileSync(example, 'utf8'), { encoding: 'utf8', flag: 'wx' });
-                console.log('[config] config.yaml dibuat dari template di ' + CONFIG_PATH);
-            } catch (e) {
-                if (e.code !== 'EEXIST') throw e;
+    const example = path.join(__dirname, 'config.example.yaml');
+    try {
+        fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+        fs.writeFileSync(CONFIG_PATH, fs.readFileSync(example, 'utf8'), { encoding: 'utf8', flag: 'wx' });
+        console.log('[config] config.yaml dibuat dari template di ' + CONFIG_PATH);
+    } catch (e) {
+        if (e.code !== 'EEXIST') {
+            if (!fs.existsSync(example) && e.code === 'ENOENT') {
+                throw new Error('config.example.yaml tidak ditemukan di ' + __dirname);
             }
-        } else {
-            throw new Error('config.example.yaml tidak ditemukan di ' + __dirname);
         }
     }
     cfg = yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {};
@@ -1044,7 +1039,7 @@ ipcMain.handle('nav:go', async (_, page) => {
     // discard the user's work without a word.
     //
     // A page with no guard answers true, so nothing needs to change on ordinary pages.
-    let boleh = true;
+    let boleh;
     try {
         boleh = await mainWindow.webContents.executeJavaScript(
             'typeof window.bolehTinggalkanHalaman === "function"'

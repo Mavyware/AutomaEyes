@@ -38,12 +38,14 @@ exports.getSession = () => readRaw().session || null;
 
 exports.setSession = (user) => {
     const state = readRaw();
-    const safeUser = user ? {
-        id: typeof user.id === 'number' ? user.id : String(user.id).substring(0, 50),
-        name: String(user.name || '').substring(0, 100),
-        email: String(user.email || '').substring(0, 100),
-        avatar_url: user.avatar_url ? String(user.avatar_url).substring(0, 200) : null
-    } : null;
+    let safeUser = null;
+    if (user && typeof user === 'object') {
+        const id = typeof user.id === 'number' ? user.id : parseInt(user.id, 10) || 0;
+        const name = String(user.name || '').replace(/[^\w\s.-]/g, '').slice(0, 100);
+        const email = String(user.email || '').replace(/[^\w@._+-]/g, '').slice(0, 100);
+        const avatar = user.avatar_url && /^https?:\/\/[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(user.avatar_url) ? String(user.avatar_url).slice(0, 255) : null;
+        safeUser = { id, name, email, avatar_url: avatar };
+    }
     state.session = { user: safeUser, loggedInAt: new Date().toISOString() };
     writeRaw(state);
     return state.session;
@@ -81,12 +83,17 @@ exports.getGithub = () => {
 
 exports.setGithub = ({ login, repo, repoUrl, token }) => {
     const state = readRaw();
-    const entry = { login, repo, repoUrl, connectedAt: new Date().toISOString() };
+    const safeLogin = String(login || '').replace(/[^\w-]/g, '').slice(0, 100);
+    const safeRepo = String(repo || '').replace(/[^\w.-]/g, '').slice(0, 100);
+    const safeRepoUrl = typeof repoUrl === 'string' && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/.test(repoUrl) ? repoUrl : '';
+    const safeToken = String(token || '').replace(/[^\w.-]/g, '').slice(0, 255);
+
+    const entry = { login: safeLogin, repo: safeRepo, repoUrl: safeRepoUrl, connectedAt: new Date().toISOString() };
     if (safeStorage.isEncryptionAvailable()) {
-        entry.tokenEncrypted = safeStorage.encryptString(token).toString('base64');
+        entry.tokenEncrypted = safeStorage.encryptString(safeToken).toString('base64');
     } else {
         // Linux without a keyring, etc. Still works, but honest about the risk.
-        entry.tokenPlain = token;
+        entry.tokenPlain = safeToken;
         console.warn('[userstore] safeStorage tidak tersedia — token GitHub disimpan tanpa enkripsi.');
     }
     state.github = entry;

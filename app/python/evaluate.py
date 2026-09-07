@@ -40,6 +40,7 @@ def device_info():
         import platform
         info["cpu"] = platform.processor() or platform.machine()
     except Exception:
+        # Platform info not available on this environment
         pass
     try:
         import torch
@@ -48,6 +49,7 @@ def device_info():
             info["device"] = "cuda"
             info["gpu"] = torch.cuda.get_device_name(0)
     except Exception:
+        # PyTorch or CUDA not available or failed inspection
         pass
     try:
         import psutil

@@ -7,7 +7,6 @@ const { pythonScript, pythonDir } = require('./paths');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const http = require('http');
 
 let currentTraining = null;
 let inferServer = null; // { child, port }

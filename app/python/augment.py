@@ -173,6 +173,7 @@ def main():
                             f.unlink()
                             removed += 1
                         except Exception:
+                            # Ignore failures deleting old augmentation files
                             pass
         print(f"[i] Regenerasi bersih: {removed} file augmentasi lama dihapus.", flush=True)
 
