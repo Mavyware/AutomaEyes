@@ -6,7 +6,7 @@ if (!GITHUB_CLIENT_ID) {
     // user would keep getting bounced to /welcome.php and land on the
     // Download page — which wouldn't explain at all that this is a server
     // misconfiguration.
-    $pageTitle = 'GitHub belum dikonfigurasi — AutomaEyes';
+    $pageTitle = 'GitHub belum dikonfigurasi: AutomaEyes';
     require __DIR__ . '/../../src/includes/header.php';
     ?>
     <main class="auth-shell">

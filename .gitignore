@@ -54,3 +54,6 @@ Thumbs.db
 # Hasil sementara dari uji Electron
 app/tests/**/hasil.json
 app/tests/**/jejak.json
+
+# Local agent skills and workspace configs
+.agents/

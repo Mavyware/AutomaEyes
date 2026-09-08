@@ -1,7 +1,7 @@
 <?php
 require __DIR__ . '/../src/bootstrap.php';
 
-$pageTitle = 'AutomaEyes — Industrial Edge AI Vision & Quality Control';
+$pageTitle = 'AutomaEyes: Industrial Edge AI Vision & Quality Control';
 $bodyClass = 'has-story-bg';
 require __DIR__ . '/../src/includes/header.php';
 ?>
@@ -16,7 +16,7 @@ require __DIR__ . '/../src/includes/header.php';
         <span class="eyebrow-pill"><span class="pulse-dot"></span> AI QUALITY CONTROL // EDGE VISION AUTOMATION</span>
       </div>
       <h1>Real-Time Industrial AI Vision.<br><span class="grad">Zero Cloud Latency.</span></h1>
-      <p class="hero-subtext">AutomaEyes inspects manufactured parts at line speed: sub-pixel defect segmentation, GD&amp;T tolerance measurements, and direct 24V PLC/Modbus actuation. Train on your own parts, on your own factory PC &mdash; with 100% on-premise air-gapped privacy.</p>
+      <p class="hero-subtext">Inspect parts at line speed: sub-pixel defect segmentation, GD&amp;T measurements, and 24V PLC actuation with 100% on-premise privacy.</p>
       
       <div class="hero-actions">
         <?php if ($user): ?>
@@ -28,7 +28,7 @@ require __DIR__ . '/../src/includes/header.php';
         <?php else: ?>
           <a href="<?= e(DOWNLOAD_PAGE) ?>" class="btn btn-primary btn-lg">
             <svg class="btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            Download Free for Windows
+            Download for Windows
           </a>
           <a href="#demo" class="btn btn-ghost btn-lg">Explore Live Simulator</a>
         <?php endif; ?>
@@ -61,15 +61,13 @@ require __DIR__ . '/../src/includes/header.php';
         </div>
       </div>
     </div>
-    <div class="scroll-cue"><span class="line"></span>[Explore Live Simulator]</div>
   </section>
 
 
   <!-- ==================== INTERACTIVE DEFECT INSPECTOR SIMULATOR ==================== -->
   <section class="demo-section" id="demo">
     <div class="section-head">
-      <span class="eyebrow">Interactive Simulator</span>
-      <h2>Test AutomaEyes in Your Browser</h2>
+      <h2>Interactive Inspection Simulator</h2>
       <p>Select an industrial part, toggle between Golden (OK) and Defective (NG) samples, inspect sub-pixel segmentation masks and GD&amp;T dimensions, and test the 24V PLC solenoid pulse.</p>
     </div>
 
@@ -194,7 +192,6 @@ require __DIR__ . '/../src/includes/header.php';
   <!-- ==================== CORE CAPABILITIES ==================== -->
   <section class="features-section" id="features">
     <div class="section-head">
-      <span class="eyebrow">Core Capabilities</span>
       <h2>Engineered for High-Speed Factory Production</h2>
       <p>Built specifically for manufacturing engineers, quality managers, and automation technicians who need dependable machine vision without vendor lock-in.</p>
     </div>
@@ -260,7 +257,6 @@ require __DIR__ . '/../src/includes/header.php';
   <!-- ==================== HOW IT WORKS (3D DIGITAL TWIN & PIPELINE) ==================== -->
   <section class="how-it-works-section" id="how-it-works">
     <div class="section-head">
-      <span class="eyebrow">Vision Pipeline</span>
       <h2>From Camera Exposure to Solenoid Ejection</h2>
       <p>Click any stage below or scroll through to see the live 3D inspection workflow, defect localization, and hardware actuation trigger.</p>
     </div>
@@ -271,7 +267,6 @@ require __DIR__ . '/../src/includes/header.php';
         <div id="story3d-canvas"></div>
 
         <div class="story3d-head">
-          <span class="eyebrow">Real-Time Processing</span>
           <h2>Autonomous Edge Inspection</h2>
         </div>
 
@@ -321,7 +316,7 @@ require __DIR__ . '/../src/includes/header.php';
                   <p>Sign in and connect your own GitHub or GitLab account. Every project, dataset, and trained model weights file lives in a private repository you control. There is zero proprietary cloud storage on our side.</p>
                   <ul>
                     <li>Private or public repositories, your choice</li>
-                    <li>Git LFS versioned datasets &mdash; no vendor lock-in</li>
+                    <li>Git LFS versioned datasets: no vendor lock-in</li>
                     <li>Revoke access from GitHub settings at any time</li>
                   </ul>
                 </div>
@@ -331,7 +326,7 @@ require __DIR__ . '/../src/includes/header.php';
                 <div class="step-copy">
                   <span class="step-index">[02] Dataset</span>
                   <h2>Trained on Photos of Your Own Workpieces</h2>
-                  <p>Create a model &mdash; detection, polygon segmentation, classification, or OCR &mdash; and import photos of the parts you actually manufacture. Generic models cannot resolve your plant's specific micro-tolerances.</p>
+                  <p>Create a model (detection, polygon segmentation, classification, or OCR) and import photos of the parts you actually manufacture. Generic models cannot resolve your plant's specific micro-tolerances.</p>
                   <ul>
                     <li>YOLOv11 segmentation, detection, and classification</li>
                     <li>Define custom class labels and inspection zones</li>
@@ -346,8 +341,8 @@ require __DIR__ . '/../src/includes/header.php';
                   <h2>Label Workpieces Without Leaving the App</h2>
                   <p>Polygon tools for complex parts, bounding boxes for rapid sorting, and circles for round bores and pins. Precise geometry is what makes millimeter GD&amp;T measurement accurate.</p>
                   <ul>
-                    <li>Built-in labeling tool &mdash; no separate web app needed</li>
-                    <li>Direct pipeline handoff &mdash; zero manual export steps</li>
+                    <li>Built-in labeling tool: no separate web app needed</li>
+                    <li>Direct pipeline handoff: zero manual export steps</li>
                     <li>Keyboard-driven hotkeys engineered for fast bulk labeling</li>
                   </ul>
                 </div>
@@ -439,7 +434,6 @@ require __DIR__ . '/../src/includes/header.php';
   <!-- ==================== HARDWARE & PLC MATRIX ==================== -->
   <section class="hardware-section" id="hardware">
     <div class="section-head">
-      <span class="eyebrow">Fieldbus &amp; Control</span>
       <h2>Industrial Hardware &amp; PLC Integration</h2>
       <p>Connect AutomaEyes straight to your factory floor. No proprietary protocol bridges required.</p>
     </div>
@@ -539,7 +533,7 @@ require __DIR__ . '/../src/includes/header.php';
             <span class="bench-sub">AWS / Azure / GCP Cloud Endpoints</span>
           </div>
           <div class="bench-col">
-            <span class="bench-badge danger">450 &ndash; 850 ms</span>
+            <span class="bench-badge danger">450 to 850 ms</span>
           </div>
           <div class="bench-col">
             <span class="bench-val fail">&lt; 1.5 parts/sec (Too slow)</span>
@@ -566,7 +560,6 @@ require __DIR__ . '/../src/includes/header.php';
   <!-- ==================== FAQ SECTION ==================== -->
   <section class="faq-section" id="faq">
     <div class="section-head">
-      <span class="eyebrow">Knowledgebase</span>
       <h2>Frequently Asked Questions</h2>
       <p>Answers to common questions about factory deployment, hardware compatibility, and data security.</p>
     </div>
@@ -598,7 +591,7 @@ require __DIR__ . '/../src/includes/header.php';
           <span class="faq-icon" aria-hidden="true">+</span>
         </summary>
         <div class="faq-answer">
-          <p>Yes. AutomaEyes includes high-speed ONNX runtime optimization for Intel and AMD multi-core CPUs, delivering 20–45ms per frame. For high-speed lines requiring &gt;50 inspections per second, an NVIDIA RTX GPU with TensorRT acceleration is recommended.</p>
+          <p>Yes. AutomaEyes includes high-speed ONNX runtime optimization for Intel and AMD multi-core CPUs, delivering 20 to 45 ms per frame. For high-speed lines requiring &gt;50 inspections per second, an NVIDIA RTX GPU with TensorRT acceleration is recommended.</p>
         </div>
       </details>
 
@@ -638,11 +631,11 @@ require __DIR__ . '/../src/includes/header.php';
   <!-- ==================== DOWNLOAD & OUTRO ==================== -->
   <section class="story-section story-outro" id="download" data-reveal>
     <h2>The Complete Industrial AI Pipeline.<br><span class="grad">Ready for Your Production Line.</span></h2>
-    <p>AutomaEyes runs locally on Windows 10/11 next to your factory cameras. The installer bundles Python, PyTorch, and ONNX runtime &mdash; so your shop floor is operational in minutes.</p>
+    <p>AutomaEyes runs locally on Windows 10/11 next to your factory cameras. The installer bundles Python, PyTorch, and ONNX runtime so your shop floor is operational in minutes.</p>
     <div class="download-panel">
       <a href="<?= e(DOWNLOAD_PAGE) ?>" class="btn btn-primary btn-lg">
         <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-        Download AutomaEyes for Windows
+        Download for Windows
       </a>
       <?php if (!$user): ?>
         <a href="/login.php" class="btn btn-ghost">Already installed? Sign in to link your account</a>

@@ -21,7 +21,7 @@ if (!$redirect || $token === '') {
 $sep = str_contains($redirect, '?') ? '&' : '?';
 $appUrl = $redirect . $sep . 'token=' . urlencode($token);
 
-$pageTitle = 'Membuka AutomaEyes — AutomaEyes';
+$pageTitle = 'Membuka AutomaEyes: AutomaEyes';
 require __DIR__ . '/../../src/includes/header.php';
 ?>
 <main class="auth-shell">

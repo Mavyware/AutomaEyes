@@ -52,7 +52,7 @@ if (!$error) {
     $error = flash('error');
 }
 
-$pageTitle = $redirect ? 'Buka AutomaEyes Desktop — AutomaEyes' : 'Log in — AutomaEyes';
+$pageTitle = $redirect ? 'Buka AutomaEyes Desktop: AutomaEyes' : 'Log in: AutomaEyes';
 require __DIR__ . '/../src/includes/header.php';
 ?>
 <canvas id="story-bg"></canvas>

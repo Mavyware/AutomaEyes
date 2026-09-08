@@ -225,8 +225,9 @@ p, li { text-wrap: pretty; }
 .story-hero {
   text-align: center;
   flex-direction: column;
-  gap: 26px;
-  padding-top: 130px;
+  gap: 22px;
+  padding-top: clamp(80px, 10vh, 96px);
+  padding-bottom: 60px;
 }
 .hero-container {
   max-width: 980px;
@@ -1326,6 +1327,31 @@ p, li { text-wrap: pretty; }
   border-radius: 4px;
   background: rgba(0, 240, 192, 0.06);
   border: 1px solid rgba(0, 240, 192, 0.16);
+}
+
+/* Bento card visual diversity (tasteskill Section 4.7) */
+.feature-card:nth-child(1) {
+  background: radial-gradient(circle at 90% 12%, rgba(0, 240, 192, 0.08) 0%, var(--panel) 65%);
+}
+.feature-card:nth-child(2) {
+  background-color: var(--panel);
+  background-image: radial-gradient(rgba(0, 240, 192, 0.12) 1px, transparent 1px);
+  background-size: 16px 16px;
+  background-position: -8px -8px;
+}
+.feature-card:nth-child(3) {
+  background: linear-gradient(155deg, rgba(20, 28, 44, 0.85) 0%, rgba(12, 16, 26, 0.95) 100%);
+  border-color: rgba(124, 92, 255, 0.25);
+}
+.feature-card:nth-child(3) .feature-icon-wrap {
+  background: rgba(124, 92, 255, 0.1);
+  border-color: rgba(124, 92, 255, 0.3);
+  color: var(--accent-2);
+}
+.feature-card:nth-child(3) .feature-tag {
+  color: var(--accent-2);
+  border-color: rgba(124, 92, 255, 0.25);
+  background: rgba(124, 92, 255, 0.08);
 }
 
 /* ==================== HOW IT WORKS SECTION ==================== */
