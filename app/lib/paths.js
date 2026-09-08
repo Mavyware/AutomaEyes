@@ -14,7 +14,7 @@ const { app } = require('electron');
 
 /** Folder containing the Python scripts (train.py, infer_server.py, evaluate.py, ...). */
 function pythonDir() {
-    return app.isPackaged
+    return (app && app.isPackaged)
         ? path.join(process.resourcesPath, 'python')
         : path.join(__dirname, '..', 'python');
 }
