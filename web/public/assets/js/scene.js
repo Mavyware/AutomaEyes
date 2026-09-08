@@ -380,7 +380,8 @@ function init() {
     const t = clock.getElapsedTime();
 
     if (!reduced) {
-      unit.rotation.y += (targetRotation - unit.rotation.y) * 0.07;
+      const ambientDrift = Math.sin(t * 0.7) * 0.08;
+      unit.rotation.y += (targetRotation + ambientDrift - unit.rotation.y) * 0.07;
       unit.position.y = BASE_Y + Math.sin(t * 0.8) * 0.04;
       scanRing.rotation.z = t * 0.35;
       iris.scale.setScalar(1 + Math.sin(t * 2.2) * 0.06);

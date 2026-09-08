@@ -36,6 +36,23 @@ body {
   overflow-x: hidden;
 }
 
+/* ==================== 3D BACKGROUND CANVAS ==================== */
+#hero-bg-3d {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.95;
+}
+
+.story, .site-header, .site-footer {
+  position: relative;
+  z-index: 1;
+}
+
 /* Accessibility: Vercel Web Interface Guidelines Skip-Link */
 .skip-link {
   position: absolute;
@@ -227,12 +244,21 @@ section[id] {
   font-size: 1rem;
 }
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(135deg, var(--accent) 0%, #00d6aa 35%, var(--accent-2) 100%);
+  background-size: 200% 200%;
+  animation: ctaShimmer 6s ease infinite;
   color: #04110d;
+  font-weight: 700;
   box-shadow: 0 8px 24px -8px rgba(0, 240, 192, .55);
 }
 .btn-primary:hover {
-  box-shadow: 0 10px 30px -6px rgba(0, 240, 192, .75);
+  box-shadow: 0 12px 36px -6px rgba(0, 240, 192, .8), 0 0 16px rgba(124, 92, 255, 0.4);
+  transform: translateY(-2px);
+}
+@keyframes ctaShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 .btn-ghost {
   background: rgba(255, 255, 255, 0.05);
@@ -316,11 +342,22 @@ section[id] {
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
-  animation: pulse-anim 2s infinite ease-in-out;
+  position: relative;
+  flex-shrink: 0;
+  display: inline-block;
 }
-@keyframes pulse-anim {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  animation: radarPing 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes radarPing {
+  0% { transform: scale(0.8); opacity: 1; }
+  75% { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(3); opacity: 0; }
 }
 
 .story-hero h1 {
@@ -464,12 +501,50 @@ section[id] {
   gap: 8px;
   color: var(--accent);
 }
+.viewport-canvas-wrapper {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+.sim-laser-sweep {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 240, 192, 0.4) 15%, #ffffff 50%, rgba(0, 240, 192, 0.4) 85%, transparent 100%);
+  box-shadow: 0 0 12px #00f0c0, 0 0 24px rgba(0, 240, 192, 0.7);
+  pointer-events: none;
+  z-index: 10;
+  animation: laserSweep 3s ease-in-out infinite;
+}
+@keyframes laserSweep {
+  0% { top: 20px; opacity: 0.15; }
+  12% { opacity: 0.95; }
+  50% { top: calc(100% - 20px); opacity: 0.95; }
+  88% { opacity: 0.95; }
+  100% { top: 20px; opacity: 0.15; }
+}
+
 #demo-canvas {
   width: 100%;
   height: auto;
   aspect-ratio: 680 / 420;
   display: block;
   background: #0a0d14;
+}
+.conveyor-track {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-right: 6px;
+  animation: conveyorShift 0.8s linear infinite;
+}
+@keyframes conveyorShift {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
 }
 .demo-viewport-footer {
   display: flex;
@@ -652,6 +727,8 @@ section[id] {
   gap: 24px;
 }
 .feature-card {
+  position: relative;
+  overflow: hidden;
   padding: 32px 28px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -659,12 +736,30 @@ section[id] {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+.feature-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(380px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0, 240, 192, 0.12), transparent 50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+.feature-card:hover::before {
+  opacity: 1;
+}
+.feature-card > * {
+  position: relative;
+  z-index: 2;
 }
 .feature-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-5px);
   border-color: rgba(0, 240, 192, 0.4);
-  box-shadow: 0 20px 40px -20px rgba(0, 240, 192, 0.2);
+  box-shadow: 0 20px 45px -15px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 240, 192, 0.15);
 }
 .feature-icon-wrap {
   width: 44px;

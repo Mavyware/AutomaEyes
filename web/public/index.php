@@ -5,7 +5,7 @@ $pageTitle = 'AutomaEyes: Industrial Edge AI Vision & Quality Control';
 $bodyClass = 'has-story-bg';
 require __DIR__ . '/../src/includes/header.php';
 ?>
-<canvas id="story-bg"></canvas>
+<canvas id="hero-bg-3d" aria-hidden="true"></canvas>
 
 <main class="story" id="main-content">
 
@@ -72,8 +72,10 @@ require __DIR__ . '/../src/includes/header.php';
             <span>TELECENTRIC OPTICS 0.5X &middot; CALIBRATED 10.4 &mu;m/px</span>
           </div>
         </div>
-
-        <canvas id="demo-canvas" width="680" height="420" role="img" aria-label="Interactive real-time machine vision inspection view"></canvas>
+        <div class="viewport-canvas-wrapper">
+          <div class="sim-laser-sweep" aria-hidden="true"></div>
+          <canvas id="demo-canvas" width="680" height="420" role="img" aria-label="Interactive real-time machine vision inspection view"></canvas>
+        </div>
 
         <div class="demo-viewport-footer">
           <span class="reticle-coords font-mono">RETICLE: X: 340.00 Y: 210.00 &middot; GAIN: 2.4 dB</span>
@@ -617,17 +619,9 @@ require __DIR__ . '/../src/includes/header.php';
 
 </main>
 
+<script type="module" src="/assets/js/bg-3d.js"></script>
+<script type="module" src="/assets/js/scene.js"></script>
 <script src="/assets/js/story.js"></script>
 <script src="/assets/js/interactive-demo.js"></script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-<script type="module" src="/assets/js/scene.js"></script>
-<script type="module" src="/assets/js/story3d.js"></script>
 
 <?php require __DIR__ . '/../src/includes/footer.php'; ?>

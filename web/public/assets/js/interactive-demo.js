@@ -417,16 +417,22 @@
     var plcStatus = document.getElementById('demo-plc-status');
     var coilBit = document.getElementById('demo-coil-bit');
 
+    var animFrameId = null;
+    var isLooping = false;
+    var startTime = performance.now();
+    var chevronFrames = ['>>> >>> >>>', ' >> >>> >>>', '  > >>> >>>', '>  > >>> >>'];
+
     function resize() {
       var rect = canvas.getBoundingClientRect();
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
-      render();
     }
 
-    function render() {
+    function render(time) {
       var W = canvas.width;
       var H = canvas.height;
+      var t = (time - startTime) * 0.001;
+
       ctx.save();
       ctx.clearRect(0, 0, W, H);
 
@@ -443,12 +449,13 @@
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
       }
 
-      // Camera Crosshair Overlay
-      ctx.strokeStyle = 'rgba(0, 240, 192, 0.15)';
+      // Camera Crosshair Overlay with subtle breathing
+      var crosshairAlpha = 0.14 + 0.06 * Math.sin(t * 2);
+      ctx.strokeStyle = 'rgba(0, 240, 192, ' + crosshairAlpha + ')';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(W / 2, 20); ctx.lineTo(W / 2, H - 20);
-      ctx.moveTo(20, H / 2); ctx.lineTo(W - 20, H / 2);
+      ctx.moveTo(W / 2, 20 * dpr); ctx.lineTo(W / 2, H - 20 * dpr);
+      ctx.moveTo(20 * dpr, H / 2); ctx.lineTo(W - 20 * dpr, H / 2);
       ctx.stroke();
 
       // Render Selected Part
@@ -457,17 +464,77 @@
         part.render(ctx, W, H, isNg, showMask, showGdt);
       }
 
+      // Continuous Industrial Laser Scanner Sweep
+      var scanPos = Math.sin(t * 1.8) * 0.5 + 0.5;
+      var scanY = 24 * dpr + scanPos * (H - 48 * dpr);
+
+      ctx.save();
+      ctx.strokeStyle = '#00f0c0';
+      ctx.lineWidth = 2 * dpr;
+      ctx.shadowColor = '#00f0c0';
+      ctx.shadowBlur = 10 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(16 * dpr, scanY);
+      ctx.lineTo(W - 16 * dpr, scanY);
+      ctx.stroke();
+
+      // Laser Soft Light Wash
+      var lGrad = ctx.createLinearGradient(0, scanY - 18 * dpr, 0, scanY + 18 * dpr);
+      lGrad.addColorStop(0, 'rgba(0, 240, 192, 0)');
+      lGrad.addColorStop(0.5, 'rgba(0, 240, 192, 0.12)');
+      lGrad.addColorStop(1, 'rgba(0, 240, 192, 0)');
+      ctx.fillStyle = lGrad;
+      ctx.fillRect(16 * dpr, scanY - 18 * dpr, W - 32 * dpr, 36 * dpr);
+      ctx.restore();
+
+      // Solenoid 24V Mechanical Reject Ejector Kick Visual
+      if (solenoidActive) {
+        ctx.save();
+        var ramWidth = 140 * dpr;
+        var ramHeight = 36 * dpr;
+        var ramY = H / 2 - ramHeight / 2;
+
+        ctx.fillStyle = '#ff4466';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2 * dpr;
+        ctx.shadowColor = '#ff4466';
+        ctx.shadowBlur = 20 * dpr;
+        ctx.fillRect(W - ramWidth, ramY, ramWidth, ramHeight);
+        ctx.strokeRect(W - ramWidth, ramY, ramWidth, ramHeight);
+
+        // Impact spark lines
+        ctx.strokeStyle = '#ffeb3b';
+        ctx.lineWidth = 2 * dpr;
+        for (var s = 0; s < 6; s++) {
+          ctx.beginPath();
+          ctx.moveTo(W - ramWidth, ramY + (s * 6 + 3) * dpr);
+          ctx.lineTo(W - ramWidth - 25 * dpr - Math.random() * 15 * dpr, ramY + (s * 6 - 5 + Math.random() * 16) * dpr);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold ' + (11 * dpr) + 'px "JetBrains Mono", monospace';
+        ctx.fillText('24V SOLENOID ACTUATED', W - ramWidth + 12 * dpr, H / 2 + 4 * dpr);
+        ctx.restore();
+      }
+
       // Camera Timestamp & Frame HUD
-      ctx.fillStyle = 'rgba(124, 140, 165, 0.7)';
+      ctx.fillStyle = 'rgba(124, 140, 165, 0.75)';
       ctx.font = (10 * dpr) + 'px "JetBrains Mono", monospace';
       ctx.fillText('OPTICS: BASLER GIGE 5.0MP // EXPOSURE: 1/2000s // ILLUM: COAXIAL 6500K', 16 * dpr, 24 * dpr);
-      ctx.fillText('ONNX TENSORRT ACCELERATED // ZERO JITTER ENVELOPE', 16 * dpr, H - 16 * dpr);
+      ctx.fillText('ONNX TENSORRT ACCELERATED // ZERO JITTER ENVELOPE // 120 FPS', 16 * dpr, H - 16 * dpr);
 
       ctx.restore();
-      updateTelemetry();
+      updateTelemetry(t);
     }
 
-    function updateTelemetry() {
+    function loop(time) {
+      if (!isLooping) return;
+      render(time);
+      animFrameId = requestAnimationFrame(loop);
+    }
+
+    function updateTelemetry(t) {
       var part = PARTS[currentPartKey];
       var stats = isNg ? part.ngStats : part.okStats;
 
@@ -484,30 +551,33 @@
       }
       if (plcStatus) {
         if (solenoidActive) {
-          plcStatus.textContent = 'SOLENOID ENERGIZED (24V 120ms PULSE)';
+          plcStatus.innerHTML = '<span class="conveyor-track" style="color:#ff5d6c;">[PULSE 120MS]</span> SOLENOID ENERGIZED &rarr; REJECT ACTUATED';
           plcStatus.className = 'plc-status-text plc-active';
         } else {
-          plcStatus.textContent = isNg ? 'REJECT ARMED -> READY TO EJECT' : 'LINE ADVANCING -> CONVEYOR RUN';
-          plcStatus.className = 'plc-status-text';
+          var chv = chevronFrames[Math.floor(t * 3.5) % chevronFrames.length];
+          if (isNg) {
+            plcStatus.innerHTML = '<span class="conveyor-track" style="color:#ff4466;">[REJECT READY]</span> COIL 0003 ARMED &rarr; REJECT ON TRIGGER';
+            plcStatus.className = 'plc-status-text';
+          } else {
+            plcStatus.innerHTML = '<span class="conveyor-track">' + chv + '</span> LINE ADVANCING &rarr; CONVEYOR RUN';
+            plcStatus.className = 'plc-status-text';
+          }
         }
       }
     }
 
     function fireSolenoid() {
       solenoidActive = true;
-      render();
       clearTimeout(solenoidTimer);
       solenoidTimer = setTimeout(function () {
         solenoidActive = false;
-        render();
-      }, 250);
+      }, 350);
     }
 
     // Events
     if (partSelect) {
       partSelect.addEventListener('change', function () {
         currentPartKey = partSelect.value;
-        render();
       });
     }
 
@@ -516,7 +586,6 @@
         isNg = false;
         btnOk.classList.add('active');
         if (btnNg) btnNg.classList.remove('active');
-        render();
       });
     }
 
@@ -525,21 +594,18 @@
         isNg = true;
         btnNg.classList.add('active');
         if (btnOk) btnOk.classList.remove('active');
-        render();
       });
     }
 
     if (toggleMask) {
       toggleMask.addEventListener('change', function () {
         showMask = toggleMask.checked;
-        render();
       });
     }
 
     if (toggleGdt) {
       toggleGdt.addEventListener('change', function () {
         showGdt = toggleGdt.checked;
-        render();
       });
     }
 
@@ -549,8 +615,41 @@
       });
     }
 
+    // Reticle Mouse Coordinate Tracking
+    canvas.addEventListener('mousemove', function (e) {
+      var rect = canvas.getBoundingClientRect();
+      var px = ((e.clientX - rect.left) / rect.width) * 680;
+      var py = ((e.clientY - rect.top) / rect.height) * 420;
+      var reticleEl = document.querySelector('.reticle-coords');
+      if (reticleEl) {
+        reticleEl.textContent = 'RETICLE: X: ' + px.toFixed(2) + ' Y: ' + py.toFixed(2) + ' · GAIN: 2.4 dB';
+      }
+    });
+
+    // Bento Card Interactive Spotlight Tracking
+    document.querySelectorAll('.bento-card, .features-grid > div, .control-block').forEach(function (el) {
+      el.addEventListener('mousemove', function (e) {
+        var rect = el.getBoundingClientRect();
+        el.style.setProperty('--mouse-x', (e.clientX - rect.left) + 'px');
+        el.style.setProperty('--mouse-y', (e.clientY - rect.top) + 'px');
+      });
+    });
+
     window.addEventListener('resize', resize);
     resize();
+
+    // IntersectionObserver for 60fps performance optimization
+    var observer = new IntersectionObserver(function (entries) {
+      var visible = entries[0].isIntersecting;
+      if (visible && !isLooping) {
+        isLooping = true;
+        animFrameId = requestAnimationFrame(loop);
+      } else if (!visible && isLooping) {
+        isLooping = false;
+        if (animFrameId) cancelAnimationFrame(animFrameId);
+      }
+    }, { threshold: 0.1 });
+    observer.observe(canvas);
   }
 
   if (document.readyState === 'loading') {
