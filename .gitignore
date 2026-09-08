@@ -27,6 +27,7 @@ projects/
 **/outputs/
 **/self_learning/
 *.onnx
+*.pt
 *.pt.bak
 
 # ---- Dependensi & build (bisa dibuat ulang) ----
