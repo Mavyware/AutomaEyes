@@ -16,7 +16,7 @@
       tolerance: 'Min clearance 0.40 mm',
       okStats: { status: 'PASS', confidence: '0.982', value: 'Clearance: 0.48 mm (OK)', gdt: 'Within ISO-1101 Class A' },
       ngStats: { status: 'REJECT', confidence: '0.994', value: 'Short bridge: 0.12 mm (FAIL)', gdt: 'USL Exceeded: +0.28 mm flash' },
-      render: function (ctx, W, H, isNg, showMask, showGdt) {
+      render: function (ctx, W, H, isNg, showMask, showGdt, scanProgress, isScanning) {
         // PCB Substrate
         ctx.fillStyle = '#0f261c';
         ctx.fillRect(40, 40, W - 80, H - 80);
@@ -67,6 +67,8 @@
         // Defect: Solder Bridge between Right Pins 4 and 5
         var defectX = cx + 70 + 4;
         var defectY = cy - pinSpacing / 2;
+        var defectDiscovered = !isScanning || scanProgress >= 0.46;
+
         if (isNg) {
           ctx.fillStyle = '#d0d8e2';
           ctx.beginPath();
@@ -74,7 +76,7 @@
           ctx.fill();
 
           // YOLO Polygon Segmentation Mask
-          if (showMask) {
+          if (showMask && defectDiscovered) {
             ctx.fillStyle = 'rgba(255, 68, 102, 0.35)';
             ctx.strokeStyle = '#ff4466';
             ctx.lineWidth = 2;
@@ -90,14 +92,14 @@
             // Defect Tag Callout
             ctx.fillStyle = '#ff4466';
             ctx.font = 'bold 11px "JetBrains Mono", monospace';
-            ctx.fillText('NG: SOLDER_BRIDGE (0.994)', defectX + 22, defectY - 4);
+            ctx.fillText('NG: SOLDER_BRIDGE (0.994)', defectX + 26, defectY - 10);
             ctx.strokeStyle = '#ff4466';
             ctx.beginPath();
             ctx.moveTo(defectX + 12, defectY);
-            ctx.lineTo(defectX + 20, defectY - 4);
+            ctx.lineTo(defectX + 24, defectY - 10);
             ctx.stroke();
           }
-        } else if (showMask) {
+        } else if (showMask && defectDiscovered) {
           // OK Inspection Bounding Polygons
           ctx.strokeStyle = 'rgba(0, 240, 192, 0.6)';
           ctx.lineWidth = 1.5;
@@ -108,7 +110,7 @@
         }
 
         // GD&T Tolerancing Calipers
-        if (showGdt) {
+        if (showGdt && (!isScanning || scanProgress >= 0.52)) {
           var y1 = cy - pinSpacing;
           var y2 = cy;
           var gx = cx + 70 + pinLen + 20;
@@ -123,7 +125,7 @@
           ctx.fillStyle = isNg ? '#ff4466' : '#00f0c0';
           ctx.font = '10px "JetBrains Mono", monospace';
           var gapText = isNg ? 'd = 0.12 mm (< 0.40 USL)' : 'd = 0.48 mm (OK)';
-          ctx.fillText(gapText, gx + 12, (y1 + y2) / 2 + 3);
+          ctx.fillText(gapText, gx + 12, (y1 + y2) / 2 + 16);
         }
       }
     },
@@ -135,7 +137,7 @@
       tolerance: 'Ø 24.00 mm ± 0.05 mm (GD&T Roundness)',
       okStats: { status: 'PASS', confidence: '0.991', value: 'Ø 24.02 mm (Ovality: 0.012 mm)', gdt: 'Parallelism: 0.008 mm' },
       ngStats: { status: 'REJECT', confidence: '0.988', value: 'Ø 24.16 mm (Ovality: 0.14 mm)', gdt: 'Burr Flash: +0.22 mm (FAIL)' },
-      render: function (ctx, W, H, isNg, showMask, showGdt) {
+      render: function (ctx, W, H, isNg, showMask, showGdt, scanProgress, isScanning) {
         var cx = W / 2, cy = H / 2;
         // Stamped metal plate body
         ctx.fillStyle = '#1c222e';
@@ -170,9 +172,10 @@
         ctx.strokeStyle = '#586985';
         ctx.stroke();
 
+        var defectDiscovered = !isScanning || scanProgress >= 0.48;
+
         // Defect: Metal Stamping Burr & Hole Ovality
         if (isNg) {
-          // Metal burr flash sticking out into bore
           ctx.fillStyle = '#7a8ea8';
           ctx.beginPath();
           ctx.moveTo(cx + r - 2, cy - 15);
@@ -181,7 +184,7 @@
           ctx.closePath();
           ctx.fill();
 
-          if (showMask) {
+          if (showMask && defectDiscovered) {
             ctx.fillStyle = 'rgba(255, 68, 102, 0.4)';
             ctx.strokeStyle = '#ff4466';
             ctx.lineWidth = 2;
@@ -200,7 +203,7 @@
         }
 
         // GD&T Diameter Caliper Reticle
-        if (showGdt) {
+        if (showGdt && (!isScanning || scanProgress >= 0.52)) {
           ctx.strokeStyle = isNg ? '#ff4466' : '#00f0c0';
           ctx.lineWidth = 1.5;
           ctx.setLineDash([4, 4]);
@@ -231,7 +234,7 @@
       tolerance: 'Fill height 45.0 mm ± 1.5 mm; Zero cracks',
       okStats: { status: 'PASS', confidence: '0.997', value: 'Fill: 44.8 mm (10.02 mL)', gdt: 'Meniscus: Level (Tilt 0.2°)' },
       ngStats: { status: 'REJECT', confidence: '0.991', value: 'Underfill: 38.2 mm (FAIL)', gdt: 'Hairline Fissure at Neck' },
-      render: function (ctx, W, H, isNg, showMask, showGdt) {
+      render: function (ctx, W, H, isNg, showMask, showGdt, scanProgress, isScanning) {
         var cx = W / 2, cy = H / 2;
         var vw = 110, vh = 220;
 
@@ -267,6 +270,9 @@
         ctx.closePath();
         ctx.fill();
 
+        var crackDiscovered = !isScanning || scanProgress >= 0.28;
+        var fillDiscovered = !isScanning || scanProgress >= 0.62;
+
         // Defect: Hairline Crack on Glass Shoulder
         if (isNg) {
           ctx.strokeStyle = '#ffffff';
@@ -277,7 +283,7 @@
           ctx.lineTo(cx + 40, cy - vh / 2 + 56);
           ctx.stroke();
 
-          if (showMask) {
+          if (showMask && crackDiscovered) {
             ctx.fillStyle = 'rgba(255, 68, 102, 0.45)';
             ctx.strokeStyle = '#ff4466';
             ctx.lineWidth = 2;
@@ -294,7 +300,7 @@
         }
 
         // GD&T Meniscus Fill Height Caliper
-        if (showGdt) {
+        if (showGdt && fillDiscovered) {
           var calX = cx - vw / 2 - 20;
           ctx.strokeStyle = isNg ? '#ff4466' : '#00f0c0';
           ctx.lineWidth = 1.5;
@@ -320,7 +326,7 @@
       tolerance: 'Pitch 1.25 mm ± 0.02 mm; Thread angle 60°',
       okStats: { status: 'PASS', confidence: '0.993', value: 'Pitch: 1.248 mm (Nominal)', gdt: 'Total Runout: 0.014 mm' },
       ngStats: { status: 'REJECT', confidence: '0.996', value: 'Stripped Thread #4 & #5', gdt: 'Pitch crest flattened 0.35 mm' },
-      render: function (ctx, W, H, isNg, showMask, showGdt) {
+      render: function (ctx, W, H, isNg, showMask, showGdt, scanProgress, isScanning) {
         var cx = W / 2, cy = H / 2;
         var boltW = 56;
         var boltH = 190;
@@ -340,6 +346,8 @@
         var shaftTop = cy - boltH / 2 + 36;
         var threads = 12;
         var tHeight = 11;
+        var defectDiscovered = !isScanning || scanProgress >= 0.50;
+
         for (var t = 0; t < threads; t++) {
           var ty = shaftTop + t * tHeight;
           var isDamaged = isNg && (t === 4 || t === 5);
@@ -359,19 +367,19 @@
           ctx.fill();
           ctx.stroke();
 
-          if (isDamaged && showMask) {
+          if (isDamaged && showMask && defectDiscovered) {
             ctx.fillStyle = 'rgba(255, 68, 102, 0.4)';
             ctx.fillRect(cx - boltW / 2 - 12, ty - 2, boltW + 24, tHeight + 4);
           }
         }
 
-        if (isNg && showMask) {
+        if (isNg && showMask && defectDiscovered) {
           ctx.fillStyle = '#ff4466';
           ctx.font = 'bold 11px "JetBrains Mono", monospace';
           ctx.fillText('NG: STRIPPED_CREST_T4', cx + boltW / 2 + 18, shaftTop + 4.5 * tHeight);
         }
 
-        if (showGdt) {
+        if (showGdt && (!isScanning || scanProgress >= 0.58)) {
           ctx.strokeStyle = isNg ? '#ff4466' : '#00f0c0';
           ctx.lineWidth = 1.5;
           var gx = cx + boltW / 2 + 12;
@@ -410,6 +418,8 @@
     var toggleMask = document.getElementById('demo-toggle-mask');
     var toggleGdt = document.getElementById('demo-toggle-gdt');
     var btnSolenoid = document.getElementById('demo-plc-pulse');
+    var btnTriggerScan = document.getElementById('demo-trigger-scan');
+    var cameraStatusText = document.getElementById('demo-camera-status-text');
     var statusBadge = document.getElementById('demo-status-badge');
     var confVal = document.getElementById('demo-conf-val');
     var latencyVal = document.getElementById('demo-latency-val');
@@ -420,21 +430,61 @@
     var animFrameId = null;
     var isLooping = false;
     var demoSection = document.getElementById('demo');
-    var targetScanPos = 0.5;
-    var currentScanPos = 0.5;
-    var isHoveringCanvas = false;
-    var mouseScanY = 0.5;
 
-    function onScrollProgress() {
+    // Single-pass laser scan state: starts at up frame (0.0) -> down frame (1.0)
+    var isScanning = false;
+    var scanStartTime = 0;
+    var scanDuration = 1150; // 1.15s clean telecentric pass
+    var scanProgress = 1.0;  // 0.0 = top, 1.0 = bottom
+    var laserOpacity = 0.0;
+    var laserFadeStart = 0;
+    var hasScannedOnce = false;
+
+    var isHoveringCanvas = false;
+    var mouseCanvasX = 340;
+    var mouseCanvasY = 210;
+
+    function triggerScan(force) {
+      if (isScanning && !force) return;
+      isScanning = true;
+      scanStartTime = performance.now();
+      scanProgress = 0.0;
+      laserOpacity = 1.0;
+      laserFadeStart = 0;
+
+      if (cameraStatusText) {
+        cameraStatusText.textContent = 'LINE SCAN IN PROGRESS // TELECENTRIC SWEEP';
+      }
+
+      updateTelemetry();
+
+      if (!isLooping) {
+        isLooping = true;
+        animFrameId = requestAnimationFrame(loop);
+      }
+    }
+
+    function onScrollCheck() {
       if (!demoSection) return;
       var rect = demoSection.getBoundingClientRect();
       var windowH = window.innerHeight;
-      // Normalized progress: 0 when top reaches bottom of screen, 1 when bottom leaves top
-      var progress = (windowH * 0.75 - rect.top) / (rect.height * 0.9);
-      targetScanPos = 0.12 + Math.max(0, Math.min(1, progress)) * 0.76;
+
+      // Section entered active viewing zone (top within bottom 72% of viewport)
+      var inView = rect.top < windowH * 0.72 && rect.bottom > windowH * 0.20;
+
+      if (inView) {
+        if (!hasScannedOnce) {
+          hasScannedOnce = true;
+          triggerScan();
+        }
+      } else if (rect.bottom < -120 || rect.top > windowH + 120) {
+        // Scrolled completely past or above; reset so re-entering triggers once again
+        hasScannedOnce = false;
+      }
     }
-    window.addEventListener('scroll', onScrollProgress, { passive: true });
-    onScrollProgress();
+    window.addEventListener('scroll', onScrollCheck, { passive: true });
+    // Check initial position in case page was loaded scrolled to simulator
+    onScrollCheck();
 
     function resize() {
       var rect = canvas.getBoundingClientRect();
@@ -445,6 +495,33 @@
     function render() {
       var W = canvas.width;
       var H = canvas.height;
+      var now = performance.now();
+
+      // Advance single-pass scan animation (never stops midway when scrolling stops!)
+      if (isScanning) {
+        var elapsed = now - scanStartTime;
+        var p = Math.min(1.0, elapsed / scanDuration);
+        scanProgress = p;
+        laserOpacity = 1.0;
+
+        if (p >= 1.0) {
+          isScanning = false;
+          scanProgress = 1.0; // Completed at bottom frame
+          laserFadeStart = now;
+          if (cameraStatusText) {
+            cameraStatusText.textContent = 'LIVE SENSOR // 120 FPS // BASLER GIGE VISION';
+          }
+        }
+      } else if (laserFadeStart > 0) {
+        // Smoothly dissolve laser line so it doesn't stay frozen on workpiece
+        var fadeElapsed = now - laserFadeStart;
+        laserOpacity = Math.max(0, 1.0 - (fadeElapsed / 280));
+        if (laserOpacity <= 0) {
+          laserFadeStart = 0;
+        }
+      } else {
+        laserOpacity = 0.0;
+      }
 
       ctx.save();
       ctx.clearRect(0, 0, W, H);
@@ -462,49 +539,68 @@
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
       }
 
-      // Camera Crosshair Overlay
-      ctx.strokeStyle = 'rgba(0, 240, 192, 0.18)';
+      // Camera Crosshair Overlay (tracks mouse on hover, centers otherwise)
+      var rx = isHoveringCanvas ? mouseCanvasX * dpr : W / 2;
+      var ry = isHoveringCanvas ? mouseCanvasY * dpr : H / 2;
+      ctx.strokeStyle = isHoveringCanvas ? 'rgba(0, 240, 192, 0.28)' : 'rgba(0, 240, 192, 0.14)';
       ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.moveTo(W / 2, 20 * dpr); ctx.lineTo(W / 2, H - 20 * dpr);
-      ctx.moveTo(20 * dpr, H / 2); ctx.lineTo(W - 20 * dpr, H / 2);
+      ctx.moveTo(rx, 16 * dpr); ctx.lineTo(rx, H - 16 * dpr);
+      ctx.moveTo(16 * dpr, ry); ctx.lineTo(W - 16 * dpr, ry);
       ctx.stroke();
+      ctx.setLineDash([]);
 
-      // Render Selected Part
+      // Render Selected Part with dynamic scan revelation
       var part = PARTS[currentPartKey];
       if (part) {
-        part.render(ctx, W, H, isNg, showMask, showGdt);
+        part.render(ctx, W, H, isNg, showMask, showGdt, scanProgress, isScanning);
       }
 
-      // Scroll & Hover Driven Laser Scanner Position (No endless auto-loops!)
-      var target = isHoveringCanvas ? mouseScanY : targetScanPos;
-      currentScanPos += (target - currentScanPos) * 0.14;
-      var scanY = 20 * dpr + currentScanPos * (H - 40 * dpr);
-
-      // Update DOM overlay laser line position with CSS variable
+      // Single-pass laser sweep from up frame (0%) to down frame (100%)
       var sweepEl = document.querySelector('.sim-laser-sweep');
-      if (sweepEl) {
-        sweepEl.style.setProperty('--laser-y', (currentScanPos * 100).toFixed(1) + '%');
+      if (laserOpacity > 0.005) {
+        var scanY = 10 * dpr + scanProgress * (H - 20 * dpr);
+
+        if (sweepEl) {
+          sweepEl.style.setProperty('--laser-y', (scanProgress * 100).toFixed(1) + '%');
+          sweepEl.style.setProperty('--laser-opacity', laserOpacity.toFixed(2));
+        }
+
+        ctx.save();
+        ctx.globalAlpha = laserOpacity;
+
+        // Laser beam line
+        ctx.strokeStyle = '#00f0c0';
+        ctx.lineWidth = 2.5 * dpr;
+        ctx.shadowColor = '#00f0c0';
+        ctx.shadowBlur = 14 * dpr;
+        ctx.beginPath();
+        ctx.moveTo(16 * dpr, scanY);
+        ctx.lineTo(W - 16 * dpr, scanY);
+        ctx.stroke();
+
+        // Laser soft light wash
+        var lGrad = ctx.createLinearGradient(0, scanY - 24 * dpr, 0, scanY + 24 * dpr);
+        lGrad.addColorStop(0, 'rgba(0, 240, 192, 0)');
+        lGrad.addColorStop(0.5, 'rgba(0, 240, 192, 0.18)');
+        lGrad.addColorStop(1, 'rgba(0, 240, 192, 0)');
+        ctx.fillStyle = lGrad;
+        ctx.fillRect(16 * dpr, scanY - 24 * dpr, W - 32 * dpr, 48 * dpr);
+
+        // Leading edge emitter sparkles
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#00f0c0';
+        ctx.shadowBlur = 8 * dpr;
+        ctx.beginPath();
+        ctx.arc(20 * dpr, scanY, 3 * dpr, 0, Math.PI * 2);
+        ctx.arc(W - 20 * dpr, scanY, 3 * dpr, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      } else if (sweepEl) {
+        sweepEl.style.setProperty('--laser-opacity', '0');
       }
-
-      ctx.save();
-      ctx.strokeStyle = '#00f0c0';
-      ctx.lineWidth = 2 * dpr;
-      ctx.shadowColor = '#00f0c0';
-      ctx.shadowBlur = 10 * dpr;
-      ctx.beginPath();
-      ctx.moveTo(16 * dpr, scanY);
-      ctx.lineTo(W - 16 * dpr, scanY);
-      ctx.stroke();
-
-      // Laser Soft Light Wash
-      var lGrad = ctx.createLinearGradient(0, scanY - 18 * dpr, 0, scanY + 18 * dpr);
-      lGrad.addColorStop(0, 'rgba(0, 240, 192, 0)');
-      lGrad.addColorStop(0.5, 'rgba(0, 240, 192, 0.12)');
-      lGrad.addColorStop(1, 'rgba(0, 240, 192, 0)');
-      ctx.fillStyle = lGrad;
-      ctx.fillRect(16 * dpr, scanY - 18 * dpr, W - 32 * dpr, 36 * dpr);
-      ctx.restore();
 
       // Solenoid 24V Mechanical Reject Ejector Kick Visual
       if (solenoidActive) {
@@ -540,7 +636,10 @@
       // Camera Timestamp & Frame HUD
       ctx.fillStyle = 'rgba(124, 140, 165, 0.75)';
       ctx.font = (10 * dpr) + 'px "JetBrains Mono", monospace';
-      ctx.fillText('OPTICS: BASLER GIGE 5.0MP // EXPOSURE: 1/2000s // ILLUM: COAXIAL 6500K', 16 * dpr, 24 * dpr);
+      var frameStatus = isScanning
+        ? 'FRAME SCAN: ' + Math.round(scanProgress * 100) + '% // TELECENTRIC PROFILOMETER'
+        : 'OPTICS: BASLER GIGE 5.0MP // EXPOSURE: 1/2000s // ILLUM: COAXIAL 6500K';
+      ctx.fillText(frameStatus, 16 * dpr, 24 * dpr);
       ctx.fillText('ONNX TENSORRT ACCELERATED // ZERO JITTER ENVELOPE // 120 FPS', 16 * dpr, H - 16 * dpr);
 
       ctx.restore();
@@ -556,6 +655,20 @@
     function updateTelemetry() {
       var part = PARTS[currentPartKey];
       var stats = isNg ? part.ngStats : part.okStats;
+
+      if (isScanning && scanProgress < 0.90) {
+        if (statusBadge) {
+          statusBadge.textContent = 'SCANNING...';
+          statusBadge.className = 'status-badge status-scanning';
+        }
+        if (confVal) confVal.textContent = (0.500 + scanProgress * 0.48).toFixed(3);
+        if (latencyVal) latencyVal.textContent = (scanProgress * 11.8).toFixed(1) + ' ms';
+        if (gdtVal) gdtVal.textContent = 'Acquiring point cloud...';
+        if (plcStatus) {
+          plcStatus.innerHTML = '<span class="conveyor-track">&gt;&gt;&gt;</span> LASER SWEEP ACTIVE &rarr; FRAME BUFFER ' + Math.round(scanProgress * 100) + '%';
+        }
+        return;
+      }
 
       if (statusBadge) {
         statusBadge.textContent = stats.status;
@@ -592,10 +705,22 @@
       }, 350);
     }
 
-    // Events
+    // Interactive Controls & Triggers
+    if (btnTriggerScan) {
+      btnTriggerScan.addEventListener('click', function () {
+        triggerScan(true);
+      });
+    }
+
+    // Clicking canvas triggers fresh scan pass
+    canvas.addEventListener('click', function () {
+      triggerScan(true);
+    });
+
     if (partSelect) {
       partSelect.addEventListener('change', function () {
         currentPartKey = partSelect.value;
+        triggerScan(true);
       });
     }
 
@@ -604,6 +729,7 @@
         isNg = false;
         btnOk.classList.add('active');
         if (btnNg) btnNg.classList.remove('active');
+        triggerScan(true);
       });
     }
 
@@ -612,6 +738,7 @@
         isNg = true;
         btnNg.classList.add('active');
         if (btnOk) btnOk.classList.remove('active');
+        triggerScan(true);
       });
     }
 
@@ -633,7 +760,7 @@
       });
     }
 
-    // Interactive Canvas Mouse Scrubbing
+    // Interactive Canvas Mouse Reticle Tracking
     canvas.addEventListener('mouseenter', function () {
       isHoveringCanvas = true;
     });
@@ -643,9 +770,11 @@
     canvas.addEventListener('mousemove', function (e) {
       isHoveringCanvas = true;
       var rect = canvas.getBoundingClientRect();
-      mouseScanY = Math.max(0.08, Math.min(0.92, (e.clientY - rect.top) / rect.height));
-      var px = ((e.clientX - rect.left) / rect.width) * 680;
-      var py = mouseScanY * 420;
+      mouseCanvasX = Math.max(10, Math.min(rect.width - 10, e.clientX - rect.left));
+      mouseCanvasY = Math.max(10, Math.min(rect.height - 10, e.clientY - rect.top));
+
+      var px = (mouseCanvasX / rect.width) * 680;
+      var py = (mouseCanvasY / rect.height) * 420;
       var reticleEl = document.querySelector('.reticle-coords');
       if (reticleEl) {
         reticleEl.textContent = 'RETICLE: X: ' + px.toFixed(2) + ' Y: ' + py.toFixed(2) + ' · GAIN: 2.4 dB';
@@ -670,7 +799,7 @@
       if (visible && !isLooping) {
         isLooping = true;
         animFrameId = requestAnimationFrame(loop);
-      } else if (!visible && isLooping) {
+      } else if (!visible && isLooping && !isScanning) {
         isLooping = false;
         if (animFrameId) cancelAnimationFrame(animFrameId);
       }

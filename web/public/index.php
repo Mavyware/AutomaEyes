@@ -66,10 +66,14 @@ require __DIR__ . '/../src/includes/header.php';
         <div class="demo-viewport-header">
           <div class="camera-status">
             <span class="pulse-dot" aria-hidden="true"></span>
-            <span>LIVE SENSOR // 120&nbsp;FPS // BASLER GIGE VISION</span>
+            <span id="demo-camera-status-text">LIVE SENSOR // 120&nbsp;FPS // BASLER GIGE VISION</span>
           </div>
           <div class="camera-lens-info">
-            <span>TELECENTRIC OPTICS 0.5X &middot; CALIBRATED 10.4 &mu;m/px</span>
+            <button type="button" id="demo-trigger-scan" class="scan-trigger-btn font-mono" title="Trigger one-shot laser inspection scan">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              <span>TRIGGER SCAN</span>
+            </button>
+            <span>TELECENTRIC 0.5X &middot; 10.4 &mu;m/px</span>
           </div>
         </div>
         <div class="viewport-canvas-wrapper">
@@ -79,7 +83,7 @@ require __DIR__ . '/../src/includes/header.php';
 
         <div class="demo-viewport-footer">
           <span class="reticle-coords font-mono">RETICLE: X: 340.00 Y: 210.00 &middot; GAIN: 2.4 dB</span>
-          <span class="frame-tag font-mono">INSPECTION CELL #01</span>
+          <span class="frame-tag font-mono">INSPECTION CELL #01 &middot; CLICK CANVAS TO SCAN</span>
         </div>
       </div>
 
