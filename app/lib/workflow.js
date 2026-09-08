@@ -37,21 +37,62 @@ function analysisFor(m) {
 }
 exports.analysisFor = analysisFor;
 
-// Return { verdict, checks:[{addon, pass, detail}], minConf }.
+// Return { verdict, checks:[{addon, pass, detail}], minConf, defectBreakdown }.
 function evaluateAddons(m, detections, measureFromBox, extra = {}) {
     const dets = detections || [];
     const addons = m.addons || [];
     const acfg = m.addonConfig || {};
     const checks = [];
     const has = (name) => addons.includes(name);
-    const minConf = dets.length ? Math.min(...dets.map(d => d.confidence || 0)) : 0;
+    const thresholds = extra.perClassThresholds || {};
+    const markedGoodList = Array.isArray(extra.markedGood) ? extra.markedGood : [];
+
+    // Filter detections according to per-class threshold controls:
+    // Size (area in mm²), Contrast (0-255 delta), and Confidence.
+    const defectBreakdown = {};
+    for (const d of dets) {
+        const cls = d.class_name;
+        const th = thresholds[cls] || {};
+        const confThresh = th.minConfidence != null ? th.minConfidence : th.confidence;
+        const minConf = confThresh != null ? confThresh : (extra.baseConf != null ? extra.baseConf : 0.25);
+        const minArea = th.minAreaMM2 != null ? th.minAreaMM2 : 0;
+        const minContrast = th.minContrast != null ? th.minContrast : 0;
+
+        d.thresholds = { minConf, minArea, minContrast };
+
+        // Check if operator marked this specific detection as good
+        const isMarkedGood = markedGoodList.some(mg =>
+            mg.class_name === cls &&
+            Math.abs((mg.x1 || 0) - d.x1) < 15 &&
+            Math.abs((mg.y1 || 0) - d.y1) < 15
+        );
+        if (isMarkedGood) d.markedGood = true;
+
+        const hasColor = has('Color Inspection');
+        const subConf = (d.confidence || 0) < minConf;
+        const subArea = minArea > 0 && (d.areaMM2 || 0) < minArea;
+        const subContrast = hasColor && minContrast > 0 && d.contrast != null && d.contrast < minContrast;
+
+        d.subThreshold = subConf || subArea || subContrast || !!d.markedGood;
+        if (d.subThreshold) {
+            d.filteredReason = d.markedGood ? 'Marked as good by operator'
+                : subConf ? `Confidence ${(d.confidence || 0).toFixed(2)} < min ${minConf}`
+                : subArea ? `Size ${(d.areaMM2 || 0).toFixed(2)} mm² < min ${minArea} mm²`
+                : `Contrast ${(d.contrast || 0).toFixed(1)} < min ${minContrast}`;
+        } else if (cls !== 'OK') {
+            defectBreakdown[cls] = (defectBreakdown[cls] || 0) + 1;
+        }
+    }
+
+    const activeDets = dets.filter(d => !d.subThreshold);
+    const minConf = activeDets.length ? Math.min(...activeDets.map(d => d.confidence || 0)) : 0;
     let verdict = 'OK';
     let incomplete = false;   // true = feature count (n) not yet met → inspection is waiting
 
     // Presence Check — the part must be PRESENT (at least 1 object detected).
     if (has('Presence Check')) {
-        const pass = dets.length >= 1;
-        checks.push({ addon: 'Presence Check', pass, detail: pass ? `${dets.length} objek terdeteksi` : 'Tidak ada objek — part hilang' });
+        const pass = activeDets.length >= 1;
+        checks.push({ addon: 'Presence Check', pass, detail: pass ? `${activeDets.length} objek terdeteksi` : 'Tidak ada objek — part hilang' });
         if (!pass) verdict = 'NG';
     }
 
@@ -59,10 +100,10 @@ function evaluateAddons(m, detections, measureFromBox, extra = {}) {
     if (has('Count')) {
         const expected = Number.isFinite(acfg.countExpected) ? acfg.countExpected : null;
         if (expected == null) {
-            checks.push({ addon: 'Count', pass: true, detail: `Target belum diatur (${dets.length} terdeteksi)` });
+            checks.push({ addon: 'Count', pass: true, detail: `Target belum diatur (${activeDets.length} terdeteksi)` });
         } else {
-            const pass = dets.length === expected;
-            checks.push({ addon: 'Count', pass, detail: `${dets.length}/${expected} objek` });
+            const pass = activeDets.length === expected;
+            checks.push({ addon: 'Count', pass, detail: `${activeDets.length}/${expected} objek` });
             if (!pass) verdict = 'NG';
         }
     }
@@ -282,14 +323,42 @@ function evaluateAddons(m, detections, measureFromBox, extra = {}) {
         }
     }
 
-    // No add-on active → default: a detected object means OK.
-    if (checks.length === 0) {
-        const pass = dets.length >= 1;
-        checks.push({ addon: 'Deteksi', pass, detail: pass ? `${dets.length} objek` : 'Tidak ada objek' });
+    // Defect check: if the model defines defect classes (classes other than 'OK'),
+    // any active (not sub-threshold) defect triggers an NG verdict.
+    const activeDefects = activeDets.filter(d => d.class_name !== 'OK');
+    const totalDefects = dets.filter(d => d.class_name !== 'OK');
+    const hasDefectClasses = (m.classes || []).some(c => c !== 'OK');
+
+    if (hasDefectClasses) {
+        if (activeDefects.length > 0) {
+            verdict = 'NG';
+            const uniqueDefects = [...new Set(activeDefects.map(d => d.class_name))];
+            checks.push({
+                addon: 'Pemeriksaan Cacat',
+                pass: false,
+                detail: `${activeDefects.length} cacat ditemukan (${uniqueDefects.join(', ')})`,
+            });
+        } else if (totalDefects.length > 0) {
+            checks.push({
+                addon: 'Pemeriksaan Cacat',
+                pass: true,
+                detail: `${totalDefects.length} deteksi di bawah ambang batas (toleransi)`,
+            });
+        } else {
+            checks.push({
+                addon: 'Pemeriksaan Cacat',
+                pass: true,
+                detail: 'Tidak ada cacat terdeteksi (OK)',
+            });
+        }
+    } else if (checks.length === 0) {
+        // No add-on active and only OK/generic class → default: a detected object means OK.
+        const pass = activeDets.length >= 1;
+        checks.push({ addon: 'Deteksi', pass, detail: pass ? `${activeDets.length} objek` : 'Tidak ada objek' });
         verdict = pass ? 'OK' : 'NG';
     }
 
-    return { verdict, checks, minConf, incomplete };
+    return { verdict, checks, minConf, incomplete, defectBreakdown };
 }
 exports.evaluateAddons = evaluateAddons;
 
@@ -351,6 +420,7 @@ async function runStep(step, sr, ctx) {
             const cx = Math.round((main.x1 + main.x2) / 2), cy = Math.round((main.y1 + main.y2) / 2);
             result.anchor = { cx, cy, box: main };
             sr.confidence = main.confidence || 0;
+            sr.addons = m.addons || [];
             sr.verdict = 'OK'; sr.reason = `Part terkunci di (${cx}, ${cy})`;
         }
         return;
@@ -368,12 +438,36 @@ async function runStep(step, sr, ctx) {
             sr.verdict = 'OK'; sr.reason = 'Tidak ada objek terdeteksi — dianggap OK (lanjut)';
             return;
         }
+
+        // Apply mmPerPixel calibration to calculate physical defect area (mm²)
+        const acfg = m.addonConfig || {};
+        const mmpp = Number(acfg.gdt && acfg.gdt.mmPerPixel) || Number(project.calibration && project.calibration.mmPerPixel) || 0;
+        sr.detections.forEach(d => {
+            const px = d.areaPx != null ? d.areaPx : Math.abs((d.x2 - d.x1) * (d.y2 - d.y1));
+            d.areaPx = px;
+            d.areaMM2 = mmpp > 0 ? Number((px * mmpp * mmpp).toFixed(3)) : Number(px.toFixed(1));
+        });
+
+        // Merge thresholds: model defaults + step overrides + adaptive baseline + runtime overrides
+        const stepThresh = (config && config.perClassThresholds) || {};
+        const modelThresh = (m && m.perClassThresholds) || {};
+        const runtimeThresh = (ctx && ctx.perClassThresholds) || {};
+        const mergedThresh = { ...modelThresh, ...stepThresh, ...runtimeThresh };
+
         // codes/text are per-frame (not per-detection), passed through separately.
-        const ev = evaluateAddons(m, sr.detections, ctx.measureFromBox, { codes: r.codes, text: r.text });
+        const ev = evaluateAddons(m, sr.detections, ctx.measureFromBox, {
+            codes: r.codes,
+            text: r.text,
+            perClassThresholds: mergedThresh,
+            markedGood: ctx.markedGood || [],
+            baseConf: conf,
+        });
         sr.verdict = ev.verdict;
         sr.checks = ev.checks;
         sr.confidence = ev.minConf;
         sr.incomplete = ev.incomplete;   // feature count (n) not yet complete → inspection is waiting
+        sr.defectBreakdown = ev.defectBreakdown || {};
+        sr.addons = m.addons || [];
         sr.reason = ev.checks.filter(c => !c.pass).map(c => `${c.addon}: ${c.detail}`).join('; ')
             || ev.checks.map(c => `${c.addon}: ${c.detail}`).join('; ');
         return;
@@ -381,6 +475,11 @@ async function runStep(step, sr, ctx) {
 
     // ---- COMMUNICATION — sends the result out (Arduino/PLC) ----
     if (cat === 'Communication') {
+        if (ctx.learningMode) {
+            sr.verdict = 'OK';
+            sr.reason = 'Mode Belajar — sinyal reject ke hardware ditekan (disimulasikan)';
+            return;
+        }
         if (ctx.noSignal) {   // tracking mode: signal is sent once per part by the renderer
             sr.verdict = 'OK'; sr.reason = 'Sinyal ditangani mode tracking (per part)';
             return;
@@ -425,10 +524,16 @@ exports.execute = async (cfg, project, imageDataUrl, arduino, output, opts = {})
         throw new Error('Workflow kosong. Buat workflow dulu.');
     }
 
+    const isLearning = !!(opts && opts.learningMode);
+    if (isLearning) {
+        opts.noSignal = true;
+    }
+
     const start = Date.now();
     const result = {
         timestamp: new Date().toISOString(),
         finalVerdict: 'OK',
+        learningMode: isLearning,
         steps: [],
     };
 
@@ -474,7 +579,14 @@ exports.execute = async (cfg, project, imageDataUrl, arduino, output, opts = {})
         }
 
         try {
-            await runStep(step, sr, { cfg, project, base64, arduino, result, conf, imgsz, presenceConf, measureFromBox: opts.measureFromBox, noSignal: opts.noSignal });
+            await runStep(step, sr, {
+                cfg, project, base64, arduino, result, conf, imgsz, presenceConf,
+                measureFromBox: opts.measureFromBox,
+                noSignal: opts.noSignal,
+                learningMode: isLearning,
+                markedGood: opts.markedGood,
+                perClassThresholds: opts.perClassThresholds,
+            });
         } catch (e) {
             sr.verdict = 'ERROR';
             sr.error = e.message;

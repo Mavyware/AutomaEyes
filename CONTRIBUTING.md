@@ -71,5 +71,5 @@ That is what lets installed copies discover the update at startup.
 - [CodeVouz](https://github.com/CodeVouz) — Founder, AutomaEyes
 - [Claude](https://github.com/claude) — AI Development Team, code changes and PR fixes
 - [ChatGPT](https://github.com/openai) — AI Development Team, code changes and PR fixes
-- [Gemini](https://github.com/gemini) — AI Development Team, CodeQL security audits and quality fixes
+- [Gemini](https://github.com/gemini) — AI Development Team, CodeQL security audits, tier-1 adaptive baseline & addons, and Git conflict resolution with real-time progress
 - [Dependabot](https://github.com/dependabot[bot]) — automated dependency updates and PR review

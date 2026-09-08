@@ -4,6 +4,12 @@
   "description": "AutomaEyes — AI Quality Control",
   "main": "main.js",
   "author": "Reno Mardiputra",
+  "contributors": [
+    "Reno Mardiputra",
+    "Code8Byte",
+    "CodeVouz",
+    "Gemini"
+  ],
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
@@ -16,6 +22,7 @@
     "test": "npm run test:sec && npm run test:cls && npm run test:runtime && npm run test:annot && npm run test:nav",
     "test:nav": "electron tests/navigation",
     "test:sec": "node tests/keamanan.js",
+    "test:tier1": "node tests/tier1_baseline_taxonomy.js",
     "check": "node scripts/check.js"
   },
   "devDependencies": {

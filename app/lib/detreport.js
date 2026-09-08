@@ -60,23 +60,49 @@ exports.buildRows = (projectDir, date, opts) => {
     const NHOLE = (opts && opts.nHole) || 6;
     const dir = path.join(projectDir, 'outputs', date);
 
+    if (!fs.existsSync(dir)) {
+        const header = ['ID', 'Gambar (link)', 'Verdict', 'Waktu Deteksi (ms)'];
+        return { rows: [header], count: 0, dir };
+    }
+
+    const files = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.json')).sort();
+
+    // First pass: scan for all distinct defect classes
+    const defectClassesSet = new Set();
+    const parsedList = [];
+    for (const f of files) {
+        let j;
+        try { j = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch (_) { continue; }
+        parsedList.push({ f, j });
+        if (j.defectBreakdown) {
+            for (const c of Object.keys(j.defectBreakdown)) defectClassesSet.add(c);
+        }
+        for (const s of (j.steps || [])) {
+            for (const d of (s.detections || [])) {
+                if (d.class_name && d.class_name !== 'OK' && !d.subThreshold) {
+                    defectClassesSet.add(d.class_name);
+                }
+            }
+        }
+    }
+    const defectClasses = Array.from(defectClassesSet).sort();
+
+    // Build header row
     const header = ['ID', 'Gambar (link)', 'Verdict'];
+    if (defectClasses.length > 0) {
+        header.push('Total Cacat', 'Cacat Utama');
+        for (const c of defectClasses) header.push(`Cacat: ${c}`);
+    }
     for (let i = 1; i <= NBOX; i++) header.push(`Kotak ${i} Panjang (mm)`, `Kotak ${i} Lebar (mm)`);
     for (let i = 1; i <= NHOLE; i++) header.push(`Lubang ${i} Ø (mm)`);
     header.push('Waktu Deteksi (ms)');
 
     const rows = [header];
-    if (!fs.existsSync(dir)) return { rows, count: 0, dir };
-
-    const files = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.json')).sort();
     let count = 0;
-    for (const f of files) {
-        let j;
-        try { j = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch (_) { continue; }
-        const insp = (j.steps || []).find(s => s.category === 'Inspection' && !s.skipped);
-        if (!insp || !Array.isArray(insp.detections)) continue;
+    const classDefectTotal = {};
+    const classPartCounts = {};
 
-        const { boxes, holes } = classify(insp.detections);
+    for (const { f, j } of parsedList) {
         const stem = f.replace(/\.json$/i, '');
         const imgPath = path.join(dir, stem + '.jpg');
         const imgCell = fs.existsSync(imgPath)
@@ -84,6 +110,50 @@ exports.buildRows = (projectDir, date, opts) => {
             : '';
 
         const row = [stem, imgCell, j.finalVerdict || ''];
+
+        // Defect breakdown per row
+        if (defectClasses.length > 0) {
+            const counts = {};
+            let totalCacat = 0;
+            let maxCount = 0;
+            let primaryDefect = '—';
+
+            if (j.defectBreakdown && typeof j.defectBreakdown === 'object') {
+                for (const [c, cnt] of Object.entries(j.defectBreakdown)) {
+                    counts[c] = (counts[c] || 0) + cnt;
+                    totalCacat += cnt;
+                    if (cnt > maxCount) { maxCount = cnt; primaryDefect = c; }
+                }
+            } else {
+                for (const s of (j.steps || [])) {
+                    for (const d of (s.detections || [])) {
+                        if (d.class_name && d.class_name !== 'OK' && !d.subThreshold) {
+                            counts[d.class_name] = (counts[d.class_name] || 0) + 1;
+                            totalCacat++;
+                            if (counts[d.class_name] > maxCount) {
+                                maxCount = counts[d.class_name];
+                                primaryDefect = d.class_name;
+                            }
+                        }
+                    }
+                }
+            }
+
+            row.push(totalCacat, primaryDefect);
+            for (const c of defectClasses) {
+                const cCount = counts[c] || 0;
+                row.push(cCount);
+                if (cCount > 0) {
+                    classDefectTotal[c] = (classDefectTotal[c] || 0) + cCount;
+                    classPartCounts[c] = (classPartCounts[c] || 0) + 1;
+                }
+            }
+        }
+
+        const insp = (j.steps || []).find(s => s.category === 'Inspection' && !s.skipped);
+        const dets = (insp && Array.isArray(insp.detections)) ? insp.detections : [];
+        const { boxes, holes } = classify(dets);
+
         for (const b of assignSlots(boxes, NBOX)) {
             if (b) row.push(gval(b, 'long'), gval(b, 'short'));
             else row.push('', '');
@@ -95,5 +165,18 @@ exports.buildRows = (projectDir, date, opts) => {
         rows.push(row);
         count++;
     }
-    return { rows, count, dir };
+
+    // Append Defect Breakdown Summary block
+    if (count > 0 && defectClasses.length > 0) {
+        rows.push([]);
+        rows.push(['--- Ringkasan Cacat ---']);
+        rows.push(['Kelas Cacat', 'Total Ditemukan', 'Part Terdampak', 'Persentase Part (%)']);
+        for (const c of defectClasses) {
+            const affectedParts = classPartCounts[c] || 0;
+            const pct = count ? Number((affectedParts / count * 100).toFixed(1)) : 0;
+            rows.push([c, classDefectTotal[c] || 0, affectedParts, pct]);
+        }
+    }
+
+    return { rows, count, dir, defectClasses, defectSummary: classDefectTotal };
 };

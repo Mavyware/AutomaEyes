@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('api', {
     modelStats: (project, model) => ipcRenderer.invoke('models:stats', { project, model }),
     importPtModel: (project, model) => ipcRenderer.invoke('models:importPt', { project, model }),
     setActiveVersion: (project, model, versionId) => ipcRenderer.invoke('models:setActiveVersion', { project, model, versionId }),
+    updateModelClasses: (project, model, classes, perClassThresholds) => ipcRenderer.invoke('models:updateClasses', { project, model, classes, perClassThresholds }),
 
     // Dataset
     pickImageFiles: () => ipcRenderer.invoke('dataset:pickFiles'),
@@ -54,6 +55,11 @@ contextBridge.exposeInMainWorld('api', {
     gitAutoPullOnce: () => ipcRenderer.invoke('git:autoPullOnce'),
     gitConflictInfo: () => ipcRenderer.invoke('git:conflictInfo'),
     gitResolveConflict: (choice, branchName) => ipcRenderer.invoke('git:resolveConflict', { choice, branchName }),
+    onGitProgress: (cb) => {
+        const handler = (_, data) => cb(data);
+        ipcRenderer.on('git:progress', handler);
+        return () => ipcRenderer.removeListener('git:progress', handler);
+    },
     quitApp: () => ipcRenderer.invoke('app:quit'),
 
     // Workflow
@@ -68,6 +74,14 @@ contextBridge.exposeInMainWorld('api', {
     arduinoReconnect: () => ipcRenderer.invoke('arduino:reconnect'),
     arduinoListPorts: () => ipcRenderer.invoke('arduino:listPorts'),
     arduinoSetPort: (port) => ipcRenderer.invoke('arduino:setPort', { port }),
+
+    // Adaptive Baseline
+    markGood: (project, model, sample, batchSize) =>
+        ipcRenderer.invoke('baseline:markGood', { project, model, sample, batchSize }),
+    getBaseline: (project, model) =>
+        ipcRenderer.invoke('baseline:get', { project, model }),
+    resetBaseline: (project, model, className) =>
+        ipcRenderer.invoke('baseline:reset', { project, model, className }),
 
     // Auto-Calibration
     runCalibration: (project, model) => ipcRenderer.invoke('calibration:run', { project, model }),

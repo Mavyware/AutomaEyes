@@ -212,30 +212,144 @@ async function showAbout() {
     }
 }
 
+// Pop-up modal dialog for error inspection and log copying.
+function tampilkanModalError(judul, pesanUtama, detailLog) {
+    const bekas = document.getElementById('modalErrorOverlay');
+    if (bekas) bekas.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'modalErrorOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:11000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)';
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#18181b;color:#f4f4f5;border:1px solid #ef4444;border-radius:10px;padding:22px;max-width:760px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.6)';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:flex-start;gap:12px;margin-bottom:12px';
+    header.innerHTML = `
+        <div style="font-size:26px;line-height:1;margin-top:2px">&#9888;&#65039;</div>
+        <div style="flex:1">
+            <h3 style="margin:0 0 4px;color:#f87171;font-size:16px;font-weight:600">${_esc(judul || 'Terjadi Kesalahan')}</h3>
+            <p style="margin:0;font-size:12px;color:#a1a1aa">${_esc(pesanUtama || 'Operasi tidak berhasil diselesaikan.')}</p>
+        </div>
+        <button id="modalErrorX" style="background:none;border:none;color:#a1a1aa;font-size:20px;cursor:pointer;padding:0 6px;line-height:1" title="Tutup">&times;</button>
+    `;
+
+    const logWrap = document.createElement('div');
+    logWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;flex:1;min-height:140px;margin-bottom:16px;overflow:hidden';
+
+    const logLabel = document.createElement('div');
+    logLabel.style.cssText = 'font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px';
+    logLabel.textContent = 'Detail Log & Pesan Error:';
+
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'flex:1;min-height:100px;max-height:360px;background:#09090b;border:1px solid #27272a;border-radius:6px;padding:12px;overflow:auto;margin:0;font-family:Consolas,Menlo,monospace;font-size:11px;line-height:1.45;color:#e4e4e7;white-space:pre-wrap;word-break:break-all';
+    pre.textContent = detailLog ? String(detailLog).trim() : 'Tidak ada catatan log tambahan.';
+
+    logWrap.appendChild(logLabel);
+    logWrap.appendChild(pre);
+
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;align-items:center';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn';
+    copyBtn.style.cssText = 'background:#27272a;color:#fafafa;border:1px solid #3f3f46;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:6px;font-weight:500';
+    copyBtn.innerHTML = '&#128203; Salin Log';
+    copyBtn.onclick = () => {
+        const textToCopy = `=== ${judul} ===\n${pesanUtama}\n\n${detailLog || ''}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                copyBtn.innerHTML = '&#10003; Tersalin!';
+                setTimeout(() => { copyBtn.innerHTML = '&#128203; Salin Log'; }, 2500);
+            });
+        }
+    };
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn primary';
+    closeBtn.style.cssText = 'background:#dc2626;color:#ffffff;border:none;padding:7px 18px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600';
+    closeBtn.textContent = 'Tutup';
+
+    const tutup = () => overlay.remove();
+    closeBtn.onclick = tutup;
+    header.querySelector('#modalErrorX').onclick = tutup;
+    overlay.onclick = (e) => { if (e.target === overlay) tutup(); };
+
+    footer.appendChild(copyBtn);
+    footer.appendChild(closeBtn);
+
+    box.appendChild(header);
+    box.appendChild(logWrap);
+    box.appendChild(footer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+}
+
 async function syncSaveToCloud(e) {
     if (e) e.stopPropagation();
     _closeUtilMenu();
     const t = _syncToast('☁️ Menyimpan & mengunggah ke GitHub… jangan tutup app.', 'info', 0);
+    const span = t ? t.querySelector('span') : null;
+    let unsub = null;
+    if (window.api && window.api.onGitProgress) {
+        unsub = window.api.onGitProgress((p) => {
+            if (span) {
+                const pct = p.percent != null ? ` [${p.percent}%]` : '';
+                const step = p.step || 'Mengunggah…';
+                span.textContent = `☁️${pct} ${step}`;
+            }
+        });
+    }
     try {
         const r = await window.api.gitPush();
-        t.remove();
-        if (r.ok) _syncToast(r.nothing ? '✓ Sudah terbaru — tidak ada perubahan untuk diunggah.' : '✓ Tersimpan & terunggah ke GitHub.', 'ok', 5000);
-        else if (r.rejected) showConflictDialog();   // GitHub's version is newer: let the user choose
-        else _syncToast('⚠️ ' + _syncShort(r.log), 'err', 9000);
-    } catch (err) { t.remove(); _syncToast('⚠️ Error: ' + err.message, 'err', 9000); }
+        if (unsub) unsub();
+        if (t) t.remove();
+        if (r.ok) {
+            _syncToast(r.nothing ? '✓ Sudah terbaru — tidak ada perubahan untuk diunggah.' : '✓ Tersimpan & terunggah ke GitHub.', 'ok', 5000);
+        } else if (r.rejected) {
+            showConflictDialog();   // GitHub's version is newer: let the user choose
+        } else {
+            tampilkanModalError('Gagal Menyimpan ke GitHub', 'Terjadi masalah saat mengunggah perubahan ke repositori GitHub.', r.log);
+        }
+    } catch (err) {
+        if (unsub) unsub();
+        if (t) t.remove();
+        tampilkanModalError('Error Menyimpan ke GitHub', 'Gagal memproses penyimpanan: ' + (err.message || err), err.stack || String(err));
+    }
 }
 
 async function syncLoadFromCloud(e) {
     if (e) e.stopPropagation();
     _closeUtilMenu();
     const t = _syncToast('⬇️ Mengambil versi terbaru dari GitHub…', 'info', 0);
+    const span = t ? t.querySelector('span') : null;
+    let unsub = null;
+    if (window.api && window.api.onGitProgress) {
+        unsub = window.api.onGitProgress((p) => {
+            if (span) {
+                const pct = p.percent != null ? ` [${p.percent}%]` : '';
+                const step = p.step || 'Mengunduh…';
+                span.textContent = `⬇️${pct} ${step}`;
+            }
+        });
+    }
     try {
         const r = await window.api.gitPull();
-        t.remove();
-        if (r.ok) _syncToast(r.upToDate ? '✓ Sudah versi terbaru.' : '✓ Versi terbaru dimuat. Refresh halaman bila perlu.', 'ok', 6000);
-        else if (r.diverged) showConflictDialog();   // history has diverged: let the user choose
-        else _syncToast('⚠️ ' + _syncShort(r.log), 'err', 9000);
-    } catch (err) { t.remove(); _syncToast('⚠️ Error: ' + err.message, 'err', 9000); }
+        if (unsub) unsub();
+        if (t) t.remove();
+        if (r.ok) {
+            _syncToast(r.upToDate ? '✓ Sudah versi terbaru.' : '✓ Versi terbaru dimuat. Refresh halaman bila perlu.', 'ok', 6000);
+        } else if (r.diverged) {
+            showConflictDialog();   // history has diverged: let the user choose
+        } else {
+            tampilkanModalError('Gagal Memuat dari GitHub', 'Terjadi masalah saat mengunduh versi terbaru dari GitHub.', r.log);
+        }
+    } catch (err) {
+        if (unsub) unsub();
+        if (t) t.remove();
+        tampilkanModalError('Error Memuat dari GitHub', 'Gagal memproses pengambilan data: ' + (err.message || err), err.stack || String(err));
+    }
 }
 
 async function showSyncStatus(e) {
@@ -358,7 +472,10 @@ _loadAccount();
 // side is always backed up first.
 async function showConflictDialog() {
     const info = await window.api.gitConflictInfo();
-    if (!info.ok) { _syncToast('&#9888;&#65039; ' + info.log, 'err', 8000); return; }
+    if (!info.ok) {
+        tampilkanModalError('Gagal Memeriksa Konflik', 'Tidak dapat memeriksa perbedaan riwayat dengan GitHub.', info.log);
+        return;
+    }
 
     const daftar = (arr, sisa) => {
         if (!arr.length) return '<span style="color:#888">tidak ada perubahan berkas</span>';
@@ -410,30 +527,89 @@ async function showConflictDialog() {
             <button class="btn" id="ckLocal">Pakai versi komputer ini</button>
             <button class="btn primary" id="ckBranchBtn">Simpan sebagai cabang baru</button>
         </div>
-        <p id="ckMsg" style="font-size:12px;margin:12px 0 0;white-space:pre-wrap"></p>`;
+        <div id="ckProgressWrap" style="display:none;margin-top:14px;padding:12px 14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span id="ckProgressTitle" style="font-size:12px;font-weight:600;color:#1e293b">Menyiapkan...</span>
+                <span id="ckProgressPct" style="font-size:12px;font-weight:700;color:#2563eb;font-family:Consolas,monospace">0%</span>
+            </div>
+            <div style="width:100%;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;margin-bottom:6px">
+                <div id="ckProgressBar" style="width:0%;height:100%;background:#2563eb;border-radius:4px;transition:width 0.2s ease, background-color 0.3s"></div>
+            </div>
+            <div id="ckProgressDetail" style="font-size:11px;color:#64748b;font-family:Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Menghubungi Git...</div>
+        </div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
+    overlay.addEventListener('click', (ev) => { if (ev.target === overlay) overlay.remove(); });
     box.querySelector('#ckCancel').onclick = () => overlay.remove();
 
-    const jalankan = async (choice, label) => {
-        const msg = box.querySelector('#ckMsg');
+    const jalankan = async (choice) => {
         const nama = (box.querySelector('#ckBranch').value || '').trim();
-        if (choice === 'branch' && !nama) { msg.style.color = '#dc2626'; msg.textContent = 'Nama cabang tidak boleh kosong.'; return; }
-        if (!await tanya(label, { judul: 'Selesaikan perbedaan', ya: 'Lanjutkan' })) return;
-        box.querySelectorAll('button').forEach((b) => (b.disabled = true));
-        msg.textContent = 'Menyelesaikan…';
-        const r = await window.api.gitResolveConflict(choice, nama);
-        msg.style.color = r.ok ? '#22a34c' : '#dc2626';
-        msg.textContent = r.log;
-        if (r.ok) setTimeout(() => { overlay.remove(); location.reload(); }, 2600);
-        else box.querySelectorAll('button').forEach((b) => (b.disabled = false));
+        if (choice === 'branch' && !nama) {
+            _syncToast('Nama cabang tidak boleh kosong.', 'err', 5000);
+            return;
+        }
+        const actionButtons = [
+            box.querySelector('#ckLocal'),
+            box.querySelector('#ckRemote'),
+            box.querySelector('#ckBranchBtn')
+        ];
+        actionButtons.forEach((b) => { if (b) b.disabled = true; });
+
+        const pWrap = box.querySelector('#ckProgressWrap');
+        const pTitle = box.querySelector('#ckProgressTitle');
+        const pPct = box.querySelector('#ckProgressPct');
+        const pBar = box.querySelector('#ckProgressBar');
+        const pDetail = box.querySelector('#ckProgressDetail');
+
+        pWrap.style.display = 'block';
+        pBar.style.width = '0%';
+        pBar.style.backgroundColor = '#2563eb';
+        pPct.textContent = '0%';
+        pTitle.textContent = 'Menyiapkan proses penyelesaian konflik...';
+        pDetail.textContent = 'Menghubungi Git...';
+
+        let unsub = null;
+        if (window.api && window.api.onGitProgress) {
+            unsub = window.api.onGitProgress((p) => {
+                if (p.percent != null) {
+                    const clamped = Math.min(100, Math.max(0, p.percent));
+                    pPct.textContent = clamped + '%';
+                    pBar.style.width = clamped + '%';
+                }
+                if (p.step) pTitle.textContent = p.step;
+                if (p.raw) pDetail.textContent = p.raw;
+            });
+        }
+
+        try {
+            const r = await window.api.gitResolveConflict(choice, nama);
+            if (unsub) unsub();
+            if (r.ok) {
+                pBar.style.width = '100%';
+                pPct.textContent = '100%';
+                pBar.style.backgroundColor = '#16a34a';
+                pTitle.textContent = '✓ ' + (r.backupBranch ? `Berhasil diselesaikan! Cadangan tersimpan di "${r.backupBranch}".` : 'Berhasil diselesaikan!');
+                pDetail.textContent = 'Memuat ulang halaman...';
+                setTimeout(() => { overlay.remove(); location.reload(); }, 1800);
+            } else {
+                pBar.style.backgroundColor = '#dc2626';
+                pTitle.textContent = '❌ Gagal menyelesaikan konflik';
+                pDetail.textContent = 'Terjadi kesalahan saat memproses.';
+                actionButtons.forEach((b) => { if (b) b.disabled = false; });
+                tampilkanModalError('Gagal Menyelesaikan Konflik', 'Operasi Git tidak berhasil diselesaikan. Silakan salin detail log di bawah untuk dilaporkan:', r.log);
+            }
+        } catch (err) {
+            if (unsub) unsub();
+            pBar.style.backgroundColor = '#dc2626';
+            pTitle.textContent = '❌ Terjadi Kesalahan';
+            pDetail.textContent = err.message || String(err);
+            actionButtons.forEach((b) => { if (b) b.disabled = false; });
+            tampilkanModalError('Gagal Menyelesaikan Konflik', 'Terjadi kesalahan saat memproses konflik: ' + (err.message || err), err.stack || String(err));
+        }
     };
-    box.querySelector('#ckLocal').onclick = () => jalankan('local',
-        'Isi komputer ini akan dipakai, dan versi di GitHub ditimpa.\nVersi GitHub tetap disimpan sebagai cadangan.');
-    box.querySelector('#ckRemote').onclick = () => jalankan('remote',
-        'Isi GitHub akan dipakai, dan perubahan di komputer ini dibuang.\nKeadaan lokal tetap disimpan sebagai cadangan.');
-    box.querySelector('#ckBranchBtn').onclick = () => jalankan('branch',
-        'Pekerjaan Anda disimpan ke cabang baru di GitHub, lalu komputer ini mengikuti versi GitHub.\nTidak ada yang ditimpa maupun dibuang.');
+    box.querySelector('#ckLocal').onclick = () => jalankan('local');
+    box.querySelector('#ckRemote').onclick = () => jalankan('remote');
+    box.querySelector('#ckBranchBtn').onclick = () => jalankan('branch');
 }
 
 // ===================== Reports (XLSX) =====================

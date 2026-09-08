@@ -554,6 +554,8 @@ ipcMain.handle('training:start', async (event, { project, model, resume }) => {
 // Set the model's active version (used as default when the workflow doesn't pick one).
 ipcMain.handle('models:setActiveVersion', (_e, { project, model, versionId }) =>
     projects.setActiveVersion(projectsRoot, project, model, versionId));
+ipcMain.handle('models:updateClasses', (_e, { project, model, classes, perClassThresholds }) =>
+    projects.updateClasses(projectsRoot, project, model, classes, perClassThresholds));
 ipcMain.handle('training:cancel', () => inference.cancelTraining());
 ipcMain.handle('training:loadHistory', (_e, { project, model }) =>
     inference.loadTrainHistory(projectsRoot, project, model));
@@ -563,11 +565,31 @@ ipcMain.handle('training:loadHistory', (_e, { project, model }) =>
 const ghToken = () => (userstore.getGithub() || {}).token || null;
 
 ipcMain.handle('git:status', () => gitsync.status(projectsRoot));
-ipcMain.handle('git:push', (_e, { message } = {}) => gitsync.push(projectsRoot, message, ghToken()));
-ipcMain.handle('git:pull', () => gitsync.pull(projectsRoot, ghToken()));
+ipcMain.handle('git:push', (event, { message } = {}) => {
+    const onProgress = (p) => {
+        if (event.sender && !event.sender.isDestroyed()) {
+            event.sender.send('git:progress', p);
+        }
+    };
+    return gitsync.push(projectsRoot, message, ghToken(), onProgress);
+});
+ipcMain.handle('git:pull', (event) => {
+    const onProgress = (p) => {
+        if (event.sender && !event.sender.isDestroyed()) {
+            event.sender.send('git:progress', p);
+        }
+    };
+    return gitsync.pull(projectsRoot, ghToken(), onProgress);
+});
 ipcMain.handle('git:conflictInfo', () => gitsync.conflictInfo(projectsRoot, ghToken()));
-ipcMain.handle('git:resolveConflict', (_e, { choice, branchName }) =>
-    gitsync.resolveConflict(projectsRoot, ghToken(), choice, branchName));
+ipcMain.handle('git:resolveConflict', (event, { choice, branchName }) => {
+    const onProgress = (p) => {
+        if (event.sender && !event.sender.isDestroyed()) {
+            event.sender.send('git:progress', p);
+        }
+    };
+    return gitsync.resolveConflict(projectsRoot, ghToken(), choice, branchName, onProgress);
+});
 ipcMain.handle('app:quit', () => { app.quit(); });
 // Auto-load the latest version once only, the first time the app is opened.
 ipcMain.handle('git:autoPullOnce', async () => {
@@ -735,11 +757,29 @@ ipcMain.handle('eval:openDir', (_, { dir }) => {
 ipcMain.handle('workflow:save', (_, { project, steps, onFirstNG }) =>
     projects.saveWorkflow(projectsRoot, project, steps, onFirstNG));
 
+// ---- Adaptive Baseline & Relearn ----
+const baseline = require('./lib/baseline');
+ipcMain.handle('baseline:markGood', (_, { project, model, sample, batchSize }) =>
+    baseline.addMarkedGoodSample(projectsRoot, project, model, sample, batchSize));
+ipcMain.handle('baseline:get', (_, { project, model }) =>
+    baseline.getModelBaseline(projectsRoot, project, model));
+ipcMain.handle('baseline:reset', (_, { project, model, className }) =>
+    baseline.resetBaseline(projectsRoot, project, model, className));
+
 // ---- Run / Inference ----
 ipcMain.handle('run:inspect', async (_, { project, imageDataUrl, opts }) => {
     // imageDataUrl = "data:image/jpeg;base64,..."
     const proj = projects.load(projectsRoot, project);
-    return workflow.execute(cfg, proj, imageDataUrl, arduino, output, opts || {});
+    const mergedOpts = { ...(opts || {}) };
+    if (!mergedOpts.perClassThresholds) {
+        const b = baseline.loadBaseline(projectsRoot, project);
+        const allModelB = {};
+        for (const [, mData] of Object.entries(b.models || {})) {
+            Object.assign(allModelB, mData.perClass || {});
+        }
+        mergedOpts.perClassThresholds = allModelB;
+    }
+    return workflow.execute(cfg, proj, imageDataUrl, arduino, output, mergedOpts);
 });
 
 // Send a single Arduino/PLC signal for ONE part (used by tracking mode:
@@ -857,10 +897,16 @@ ipcMain.handle('report:dailyXlsx', (_, { project, date }) => {
             ['OK', s.ok || 0],
             ['NG', s.ng || 0],
             ['Success rate (%)', s.total ? Number((s.ok / s.total * 100).toFixed(2)) : 0],
-            ['Waktu siklus rata-rata (ms)', Number((s.avgCycleMS || 0).toFixed(1))],
             [],
             ['NG per step', 'Jumlah'],
             ...Object.entries(s.byStep || {}).map(([k, v]) => [k, v]),
+            [],
+            ['Breakdown NG per Kelas Cacat', 'Jumlah', 'Persentase (%)'],
+            ...Object.entries(s.byClass || {}).map(([cls, cnt]) => [
+                cls,
+                cnt,
+                s.ng ? Number((cnt / s.ng * 100).toFixed(1)) : 0,
+            ]),
         ];
         xlsxlite.write(xlsxPath, 'Laporan', rows);
         return { ok: true, xlsxPath, summary: s };

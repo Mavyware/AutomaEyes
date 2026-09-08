@@ -113,6 +113,39 @@ def main():
         return {"count": count, "worstElongation": worst,
                 "edgeRatio": float(cv2.countNonZero(edges)) / area_roi}
 
+    def analyze_contrast(arr_bgr, det, pad=6):
+        """
+        Calculate local contrast (0-255) of candidate defect relative to its surrounding background.
+        |mean(defect_gray) - mean(background_ring_gray)|.
+        """
+        if arr_bgr is None or cv2 is None:
+            return 0.0
+        h, w = arr_bgr.shape[:2]
+        x1, y1 = max(0, int(det["x1"])), max(0, int(det["y1"]))
+        x2, y2 = min(w, int(det["x2"])), min(h, int(det["y2"]))
+        if x2 <= x1 or y2 <= y1:
+            return 0.0
+
+        roi = arr_bgr[y1:y2, x1:x2]
+        gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        defect_mean = float(np.mean(gray_roi))
+
+        ox1, oy1 = max(0, x1 - pad), max(0, y1 - pad)
+        ox2, oy2 = min(w, x2 + pad), min(h, y2 + pad)
+        if ox2 <= ox1 or oy2 <= oy1:
+            return 0.0
+
+        outer = arr_bgr[oy1:oy2, ox1:ox2]
+        gray_outer = cv2.cvtColor(outer, cv2.COLOR_BGR2GRAY)
+        mask = np.ones(gray_outer.shape, dtype=np.uint8) * 255
+        mask[y1 - oy1:y2 - oy1, x1 - ox1:x2 - ox1] = 0
+
+        ring_pixels = gray_outer[mask > 0]
+        if len(ring_pixels) == 0:
+            return 0.0
+        bg_mean = float(np.mean(ring_pixels))
+        return round(abs(defect_mean - bg_mean), 2)
+
     def analyze_codes(arr_bgr):
         """Decode QR (2D Code) and barcode (1D Code) from the whole frame."""
         out = {"qr": [], "barcode": []}
@@ -194,6 +227,7 @@ def main():
             detections.append({
                 "x1": 0.0, "y1": 0.0, "x2": float(w), "y2": float(h),
                 "confidence": c, "class_id": ci, "class_name": cls_name,
+                "areaPx": float(w * h), "contrast": 0.0,
             })
             if cls_name != "OK":
                 verdict = "NG"
@@ -213,25 +247,41 @@ def main():
                 c = float(box.conf[0])
                 xyxy = box.xyxy[0].tolist()
                 cls_name = classes[cls_id] if cls_id < len(classes) else str(cls_id)
+                w_px = max(0.0, float(xyxy[2] - xyxy[0]))
+                h_px = max(0.0, float(xyxy[3] - xyxy[1]))
+                area_px = float(round(w_px * h_px, 2))
                 det = {
                     "x1": xyxy[0], "y1": xyxy[1], "x2": xyxy[2], "y2": xyxy[3],
                     "confidence": c, "class_id": cls_id, "class_name": cls_name,
+                    "areaPx": area_px,
+                    "contrast": 0.0,
                 }
                 if masks_xy is not None and j < len(masks_xy):
                     meas = measure_from_contour(masks_xy[j])
                     if meas:
                         det["measure"] = meas
+                        if meas.get("areaPx"):
+                            det["areaPx"] = meas["areaPx"]
                 detections.append(det)
                 if cls_name != "OK":
                     verdict = "NG"
                     if c < min_conf:
                         min_conf = c
+
+        # Compute local contrast for detections
+        arr_bgr = None
+        if detections and cv2 is not None:
+            arr_bgr = arr[:, :, ::-1].copy()
+            for d in detections:
+                d["contrast"] = analyze_contrast(arr_bgr, d)
+
         # Extra analysis only runs when its add-on is actually in use, so a
         # frame that doesn't need it doesn't pay the CV cost.
         want = set(req.get("analyze") or [])
         extra = {}
         if want:
-            arr_bgr = arr[:, :, ::-1].copy() if cv2 is not None else None
+            if arr_bgr is None and cv2 is not None:
+                arr_bgr = arr[:, :, ::-1].copy()
             if "color" in want and arr_bgr is not None:
                 for d in detections:
                     c = analyze_color(arr_bgr, d)

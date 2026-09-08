@@ -22,6 +22,14 @@
         <div style="padding:12px" id="addonRulesBody"></div>
     </div>
 
+    <div class="card" id="classManagerCard" style="margin-bottom:12px">
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span>🏷️ Taksonomi Kelas Cacat &amp; Ambang Batas Default</span>
+            <button class="btn small" type="button" onclick="openAddClassPrompt()">+ Tambah Kelas</button>
+        </div>
+        <div style="padding:12px" id="classManagerBody"></div>
+    </div>
+
     <div class="tabs">
         <div class="tab-headers">
             <button class="active" onclick="showTab(this,'dataset')">📁 1 &middot; Dataset</button>
@@ -385,6 +393,21 @@
                         <h4 style="margin-top:14px">Grafik</h4>
                         <div class="eval-plots" id="evPlots"></div>
 
+                        <div class="card" id="testTuningCard" style="margin-top:14px;background:var(--panel-alt)">
+                            <div class="section-title">🎯 Live Per-Class Tuning (Uji Ambang Cacat &amp; Filter Noise)</div>
+                            <div style="padding:12px">
+                                <p class="muted" style="font-size:11px;margin:0 0 8px">
+                                    Uji ambang batas per-kelas secara langsung pada hasil evaluasi (min confidence, min area mm², min kontras).
+                                </p>
+                                <div id="testClassTuningTable"></div>
+                                <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+                                    <button class="btn small primary" type="button" onclick="applyTestTuning()">🔍 Terapkan Filter ke Hasil Prediksi</button>
+                                    <button class="btn small" type="button" onclick="saveTestTuningToModel()">💾 Simpan sebagai Ambang Default Model</button>
+                                    <span id="testTuningStatus" class="muted" style="font-size:11px"></span>
+                                </div>
+                            </div>
+                        </div>
+
                         <h4 style="margin-top:14px">Prediksi (<span id="evPredCount">0</span> gambar)</h4>
                         <div id="evPreds" class="eval-preds"></div>
                     </div>
@@ -597,6 +620,8 @@ async function render() {
         `Sekarang: <strong>${stats.train}</strong> train · <strong>${stats.val || 0}</strong> val · <strong>${stats.test || 0}</strong> test`;
 
     renderAddonRules();
+    renderClassManager();
+    renderTestClassTuning();
 
     document.getElementById('epochs').value = currentModel.training.epochs;
     document.getElementById('batch').value = currentModel.training.batch;
@@ -1140,6 +1165,7 @@ function renderEval(res) {
     document.getElementById('evR').textContent = _pe(o.recall);
 
     renderEvalTiming(res.timing);
+    renderTestClassTuning();
 
     const tb = document.querySelector('#evTable tbody');
     tb.innerHTML = (res.perClass || []).map(c =>
@@ -1579,7 +1605,22 @@ function renderAddonRules() {
             </div>`);
     }
 
-    const configurable = addons.includes('Count') || addons.includes('GD&T Measurement');
+    if (addons.includes('Color Inspection')) {
+        const cc = cfg.color || {};
+        const tol = Number.isFinite(cc.tolerance) ? cc.tolerance : 25;
+        blocks.push(`<p style="margin:10px 0 2px"><strong>Color Inspection</strong> — cek kesesuaian warna objek dan perbedaan kontras.</p>
+            <div style="margin:0 0 8px 4px;border-left:2px solid var(--border);padding-left:12px">
+                <label style="display:block;margin:4px 0">Toleransi Hue (derajat ±)
+                    <input type="number" id="ruleColorTol" min="1" max="90" value="${tol}" style="width:80px">
+                    <span class="muted" style="font-size:11px;margin-left:6px">(Rentang Hue 0-180 di OpenCV, default 25)</span>
+                </label>
+                <p class="muted" style="font-size:11px;margin:4px 0">
+                    Ambang batas perbedaan kontras (Min Contrast Δ) untuk setiap kelas cacat dapat diatur pada tabel Taksonomi Kelas di atas.
+                </p>
+            </div>`);
+    }
+
+    const configurable = addons.includes('Count') || addons.includes('GD&T Measurement') || addons.includes('Color Inspection');
     body.innerHTML = `
         <p class="muted" style="font-size:12px;margin:0 0 8px">Add-on aktif untuk model ini (dipilih saat model dibuat):</p>
         ${blocks.join('')}
@@ -1767,6 +1808,11 @@ async function saveAddonRules() {
         });
         addonConfig.gdt = gdt;
     }
+    if (addons.includes('Color Inspection') && el('ruleColorTol')) {
+        const color = Object.assign({}, addonConfig.color || {});
+        color.tolerance = num('ruleColorTol') != null ? num('ruleColorTol') : 25;
+        addonConfig.color = color;
+    }
     try {
         await window.api.updateModel(projectName, modelName, { addonConfig });
         currentModel.addonConfig = addonConfig;
@@ -1774,6 +1820,253 @@ async function saveAddonRules() {
         renderAddonRules();
     } catch (e) {
         if (st) st.textContent = '❌ ' + e.message;
+    }
+}
+
+// ==== Defect Class Taxonomy & Per-Class Thresholds Manager ====
+function renderClassManager() {
+    const body = document.getElementById('classManagerBody');
+    if (!body || !currentModel) return;
+    const classes = currentModel.classes || [];
+    const thresholds = currentModel.perClassThresholds || {};
+    const hasColor = (currentModel.addons || []).includes('Color Inspection');
+    const isCls = currentModel.type === 'AI Classification' || currentModel.aiType === 'AI Classification';
+
+    if (!classes.length) {
+        body.innerHTML = '<p class="muted" style="font-size:12px">Belum ada kelas cacat pada model ini.</p>';
+        return;
+    }
+
+    const rows = classes.map((cls, idx) => {
+        const t = thresholds[cls] || {};
+        return `
+            <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:6px;font-weight:600;font-size:12px">
+                    <span class="tag" style="font-size:11px">${esc(cls)}</span>
+                </td>
+                <td style="padding:6px">
+                    <input type="number" step="0.05" min="0.05" max="0.95" id="cm_conf_${idx}" 
+                        value="${t.minConfidence != null ? t.minConfidence : 0.25}" style="width:65px;padding:3px;font-size:11px">
+                </td>
+                ${!isCls ? `
+                <td style="padding:6px">
+                    <input type="number" step="0.1" min="0" id="cm_area_${idx}" 
+                        value="${t.minAreaMM2 != null ? t.minAreaMM2 : 0}" style="width:65px;padding:3px;font-size:11px">
+                </td>` : ''}
+                ${hasColor ? `
+                <td style="padding:6px">
+                    <input type="number" step="1" min="0" max="255" id="cm_cont_${idx}" 
+                        value="${t.minContrast != null ? t.minContrast : 0}" style="width:65px;padding:3px;font-size:11px">
+                </td>` : ''}
+            </tr>
+        `;
+    }).join('');
+
+    const descText = hasColor
+        ? 'Atur ambang batas default per-kelas cacat (Confidence, Luas minimum mm², Kontras minimum grayscale). Nilai ini diwarisi oleh setiap Inspection step di Workflow.'
+        : (!isCls
+            ? 'Atur ambang batas default per-kelas cacat (Confidence, Luas minimum mm²). Nilai ini diwarisi oleh setiap Inspection step di Workflow.'
+            : 'Atur ambang batas default per-kelas cacat (Confidence). Nilai ini diwarisi oleh setiap Inspection step di Workflow.');
+
+    body.innerHTML = `
+        <p class="muted" style="font-size:11px;margin:0 0 8px">
+            ${descText}
+        </p>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+            <thead>
+                <tr style="border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)">
+                    <th style="text-align:left;padding:4px 6px">Nama Kelas</th>
+                    <th style="text-align:left;padding:4px 6px">Min Conf</th>
+                    ${!isCls ? '<th style="text-align:left;padding:4px 6px">Min Area (mm²)</th>' : ''}
+                    ${hasColor ? '<th style="text-align:left;padding:4px 6px">Min Contrast (Δ)</th>' : ''}
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn small primary" type="button" onclick="saveClassManager()">💾 Simpan Ambang Taksonomi</button>
+            <span id="classManagerStatus" class="muted" style="font-size:11px"></span>
+        </div>
+    `;
+}
+
+async function saveClassManager() {
+    const st = document.getElementById('classManagerStatus');
+    if (!currentModel) return;
+    const classes = currentModel.classes || [];
+    const thresholds = {};
+    const hasColor = (currentModel.addons || []).includes('Color Inspection');
+    const isCls = currentModel.type === 'AI Classification' || currentModel.aiType === 'AI Classification';
+
+    classes.forEach((cls, idx) => {
+        const conf = parseFloat((document.getElementById(`cm_conf_${idx}`) || {}).value);
+        const area = !isCls ? parseFloat((document.getElementById(`cm_area_${idx}`) || {}).value) : 0;
+        const cont = hasColor ? parseFloat((document.getElementById(`cm_cont_${idx}`) || {}).value) : 0;
+        thresholds[cls] = {
+            minConfidence: isNaN(conf) ? 0.25 : conf,
+            minAreaMM2: isNaN(area) ? 0 : area,
+            minContrast: isNaN(cont) ? 0 : cont
+        };
+    });
+
+    try {
+        await window.api.updateModelClasses(projectName, modelName, classes, thresholds);
+        currentModel.perClassThresholds = thresholds;
+        if (st) st.textContent = '✓ Taksonomi & ambang tersimpan';
+        pesan('✓ Ambang batas kelas berhasil disimpan!', 'ok');
+    } catch (e) {
+        if (st) st.textContent = '❌ ' + e.message;
+        pesan('Gagal simpan: ' + e.message, 'err');
+    }
+}
+
+async function openAddClassPrompt() {
+    const name = await tanya('Masukkan nama kelas cacat baru (mis. scratch, pinhole, stain):', { prompt: true, placeholder: 'nama_kelas' });
+    if (!name) return;
+    const clean = name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    if (!clean) return;
+    if ((currentModel.classes || []).includes(clean)) {
+        pesan(`Kelas '${clean}' sudah ada.`, 'warn');
+        return;
+    }
+    const newClasses = [...(currentModel.classes || []), clean];
+    const thresholds = Object.assign({}, currentModel.perClassThresholds || {});
+    thresholds[clean] = { minConfidence: 0.25, minAreaMM2: 0, minContrast: 0 };
+    try {
+        await window.api.updateModelClasses(projectName, modelName, newClasses, thresholds);
+        currentModel.classes = newClasses;
+        currentModel.perClassThresholds = thresholds;
+        render();
+        pesan(`✓ Kelas '${clean}' berhasil ditambahkan ke taksonomi model!`, 'ok');
+    } catch (e) {
+        pesan('Gagal menambah kelas: ' + e.message, 'err');
+    }
+}
+
+// ==== Live Per-Class Tuning in Test Tab ====
+let testClassFilter = {};
+
+function renderTestClassTuning() {
+    const box = document.getElementById('testClassTuningTable');
+    if (!box || !currentModel) return;
+    const classes = currentModel.classes || [];
+    const defaults = currentModel.perClassThresholds || {};
+    const hasColor = (currentModel.addons || []).includes('Color Inspection');
+    const isCls = currentModel.type === 'AI Classification' || currentModel.aiType === 'AI Classification';
+
+    if (!classes.length) {
+        box.innerHTML = '<p class="muted" style="font-size:11px">Model belum punya kelas.</p>';
+        return;
+    }
+
+    const rows = classes.map((cls, idx) => {
+        const cur = testClassFilter[cls] || defaults[cls] || {};
+        const conf = cur.minConfidence != null ? cur.minConfidence : 0.25;
+        const area = cur.minAreaMM2 != null ? cur.minAreaMM2 : 0;
+        const cont = cur.minContrast != null ? cur.minContrast : 0;
+
+        return `
+            <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:4px;font-weight:600;font-size:11px">${esc(cls)}</td>
+                <td style="padding:4px">
+                    <input type="number" step="0.05" min="0.05" max="0.95" id="tt_conf_${idx}" value="${conf}" style="width:55px;padding:2px;font-size:11px">
+                </td>
+                ${!isCls ? `
+                <td style="padding:4px">
+                    <input type="number" step="0.1" min="0" id="tt_area_${idx}" value="${area}" style="width:55px;padding:2px;font-size:11px">
+                </td>` : ''}
+                ${hasColor ? `
+                <td style="padding:4px">
+                    <input type="number" step="1" min="0" max="255" id="tt_cont_${idx}" value="${cont}" style="width:55px;padding:2px;font-size:11px">
+                </td>` : ''}
+            </tr>
+        `;
+    }).join('');
+
+    box.innerHTML = `
+        <table style="width:100%;border-collapse:collapse">
+            <thead>
+                <tr style="border-bottom:1px solid var(--border);font-size:10px;color:var(--muted)">
+                    <th style="text-align:left;padding:2px 4px">Kelas</th>
+                    <th style="text-align:left;padding:2px 4px">Min Conf</th>
+                    ${!isCls ? '<th style="text-align:left;padding:2px 4px">Min Area (mm²)</th>' : ''}
+                    ${hasColor ? '<th style="text-align:left;padding:2px 4px">Min Contrast (Δ)</th>' : ''}
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+function applyTestTuning() {
+    if (!currentModel || !lastEval) {
+        pesan('Jalankan Test evaluasi terlebih dahulu.', 'warn');
+        return;
+    }
+    const classes = currentModel.classes || [];
+    const hasColor = (currentModel.addons || []).includes('Color Inspection');
+    const isCls = currentModel.type === 'AI Classification' || currentModel.aiType === 'AI Classification';
+
+    classes.forEach((cls, idx) => {
+        const conf = parseFloat((document.getElementById(`tt_conf_${idx}`) || {}).value);
+        const area = !isCls ? parseFloat((document.getElementById(`tt_area_${idx}`) || {}).value) : 0;
+        const cont = hasColor ? parseFloat((document.getElementById(`tt_cont_${idx}`) || {}).value) : 0;
+        testClassFilter[cls] = {
+            minConfidence: isNaN(conf) ? 0.25 : conf,
+            minAreaMM2: isNaN(area) ? 0 : area,
+            minContrast: isNaN(cont) ? 0 : cont
+        };
+    });
+
+    const preds = lastEval.predictions || [];
+    let filteredCount = 0;
+    const items = preds.slice(0, 200).map(pr => {
+        const visibleDets = (pr.detections || []).filter(d => {
+            const cls = d.name || d.class_name;
+            const f = testClassFilter[cls] || {};
+            if (f.minConfidence != null && d.conf < f.minConfidence) return false;
+            if (!isCls && f.minAreaMM2 != null && d.areaMM2 != null && d.areaMM2 < f.minAreaMM2) return false;
+            if (hasColor && f.minContrast != null && d.contrast != null && d.contrast < f.minContrast) return false;
+            return true;
+        });
+        filteredCount += visibleDets.length;
+        const det = visibleDets.length
+            ? visibleDets.map(d => `${esc(d.name || d.class_name)} ${(d.conf * 100).toFixed(0)}%`).join(', ')
+            : '<span class="muted">(noise disaring / tidak ada cacat)</span>';
+        const ms = pr.ms ? `<br><b>${pr.ms.total} ms</b> (inferensi ${pr.ms.inference} ms)` : '';
+        return `<div class="gp"><img src="file://${pr.image.replace(/\\/g, '/')}"><div class="cap">${esc(pr.name)}${ms}<br>${det}</div></div>`;
+    });
+
+    document.getElementById('evPreds').innerHTML = items.join('') || '<p class="muted">Tidak ada gambar di split ini.</p>';
+    const st = document.getElementById('testTuningStatus');
+    if (st) st.textContent = `✓ Filter aktif: ${filteredCount} deteksi lolos ambang batas`;
+}
+
+async function saveTestTuningToModel() {
+    if (!currentModel) return;
+    const classes = currentModel.classes || [];
+    const thresholds = {};
+    const hasColor = (currentModel.addons || []).includes('Color Inspection');
+    const isCls = currentModel.type === 'AI Classification' || currentModel.aiType === 'AI Classification';
+
+    classes.forEach((cls, idx) => {
+        const conf = parseFloat((document.getElementById(`tt_conf_${idx}`) || {}).value);
+        const area = !isCls ? parseFloat((document.getElementById(`tt_area_${idx}`) || {}).value) : 0;
+        const cont = hasColor ? parseFloat((document.getElementById(`tt_cont_${idx}`) || {}).value) : 0;
+        thresholds[cls] = {
+            minConfidence: isNaN(conf) ? 0.25 : conf,
+            minAreaMM2: isNaN(area) ? 0 : area,
+            minContrast: isNaN(cont) ? 0 : cont
+        };
+    });
+
+    try {
+        await window.api.updateModelClasses(projectName, modelName, classes, thresholds);
+        currentModel.perClassThresholds = thresholds;
+        renderClassManager();
+        pesan('✓ Ambang hasil tuning disimpan sebagai default model!', 'ok');
+    } catch (e) {
+        pesan('Gagal simpan ambang: ' + e.message, 'err');
     }
 }
 

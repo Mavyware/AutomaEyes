@@ -34,17 +34,27 @@
         <!-- LEFT: Palette (workflow chain) + Step Results di bawahnya -->
         <div style="display:flex;flex-direction:column;overflow:hidden;min-height:0">
             <div class="palette" id="palette" style="flex:1 1 auto;overflow-y:auto"></div>
-            <div class="results-section" style="border-top:1px solid var(--border);flex:0 0 auto;max-height:240px;overflow-y:auto">
+            <div class="results-section" style="border-top:1px solid var(--border);flex:0 0 auto;max-height:200px;overflow-y:auto">
                 <h4>Step Results</h4>
                 <table class="table">
                     <thead><tr><th>#</th><th>Model</th><th>Verdict</th><th>Conf</th></tr></thead>
                     <tbody id="stepRows"><tr><td colspan="4" class="muted">Belum ada hasil</td></tr></tbody>
                 </table>
             </div>
+            <div class="results-section" id="reviewSection" style="border-top:1px solid var(--border);flex:1 1 auto;max-height:240px;overflow-y:auto">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                    <h4 style="margin:0">Review / Relearn</h4>
+                    <span id="relearnBatchBadge" class="muted" style="font-size:10px"></span>
+                </div>
+                <div id="flaggedDetsList" class="muted" style="font-size:11px">Belum ada deteksi untuk direview</div>
+            </div>
         </div>
 
         <!-- CENTER: Image viewer + filmstrip -->
         <div class="camera-panel">
+            <div id="learningBanner" style="display:none;background:#f59e0b;color:#000;padding:5px 10px;font-size:11px;font-weight:700;text-align:center;border-radius:4px 4px 0 0">
+                🎓 MODE BELAJAR AKTIF — SINYAL REJECT KE HARDWARE DITEKAN (SIMULASI REVIEW)
+            </div>
             <div class="image-viewer">
                 <video id="cam" autoplay muted playsinline style="display:none"></video>
                 <img id="snapImg" class="snapshot" style="display:none" />
@@ -63,6 +73,12 @@
         <div class="results-panel" style="overflow-y:auto">
             <div class="results-section">
                 <h4>Live Settings</h4>
+                <label style="display:block;font-size:12px;margin-bottom:4px;color:#f59e0b;font-weight:700">
+                    <input type="checkbox" id="learningToggle" onchange="onToggleLearning()"> 🎓 Mode Belajar (Suppress Reject)
+                </label>
+                <p class="muted" style="font-size:10px;margin:0 0 4px">Sinyal tolak/reject ke hardware ditekan saat baseline disesuaikan. Hasil tetap dicatat penuh.</p>
+                <label style="display:block;font-size:12px;margin-bottom:4px">Ukuran batch relearn
+                    <input type="number" id="batchRelearnSize" value="10" min="3" max="50" style="width:60px"></label>
                 <label style="display:block;font-size:12px;margin-bottom:4px">Confidence (inspeksi/ukur)
                     <input type="number" id="liveConf" value="0.25" min="0.05" max="0.95" step="0.05" style="width:90px"></label>
                 <label style="display:block;font-size:12px;margin-bottom:4px">Confidence presence (deteksi part)
@@ -445,7 +461,7 @@ async function inspectFrame(forceFull) {
             const pc = parseFloat(document.getElementById('presenceConf').value);
             const presConf = isNaN(pc) ? confVal : pc;
             const lite = await window.api.inspect(projectName, dataUrl,
-                { confidence: presConf, presenceConf: presConf, light: true, noSignal: true, noSave: true });
+                { confidence: presConf, presenceConf: presConf, light: true, noSignal: true, noSave: true, learningMode: isLearningMode() });
             updateFps(performance.now() - t0, lite);
             await handleTracking(lite, dataUrl, confVal);
         } else {
@@ -453,7 +469,7 @@ async function inspectFrame(forceFull) {
             // presenceConf → the Object Detector (Positioning) still uses a low threshold, for consistency.
             const pcm = parseFloat((document.getElementById('presenceConf') || {}).value);
             const result = await window.api.inspect(projectName, dataUrl,
-                { confidence: confVal, presenceConf: isNaN(pcm) ? undefined : pcm, noSignal: trackMode() });
+                { confidence: confVal, presenceConf: isNaN(pcm) ? undefined : pcm, noSignal: trackMode(), learningMode: isLearningMode() });
             updateFps(performance.now() - t0, result);
             renderResult(result, dataUrl);
         }
@@ -567,14 +583,28 @@ function drawBoxes(ctx, result, cvWidth) {
             const key = `${Math.round(d.x1)},${Math.round(d.y1)},${Math.round(d.x2)},${Math.round(d.y2)},${d.class_id}`;
             if (seen.has(key)) return; seen.add(key);
 
+            const isSub = !!d.subThreshold;
+            const isMarked = !!d.markedGood;
             const gdt = d.gdt ? (Array.isArray(d.gdt) ? d.gdt : [d.gdt]) : null;
             const baseCol = DET_COLORS[(d.class_id || 0) % DET_COLORS.length];
             // red if something failed (ok===false); green if something passed; blue = raw measurement (ok===null)
-            const boxCol = gdt
+            let boxCol = gdt
                 ? (gdt.some(l => l.ok === false) ? '#ef4444' : gdt.some(l => l.ok === true) ? '#22c55e' : '#3b82f6')
                 : baseCol;
+
+            if (isMarked) {
+                boxCol = '#10b981';
+                ctx.setLineDash([4, 4]);
+            } else if (isSub) {
+                boxCol = '#94a3b8';
+                ctx.setLineDash([2, 4]);
+            } else {
+                ctx.setLineDash([]);
+            }
+
             ctx.strokeStyle = boxCol;
             ctx.strokeRect(d.x1, d.y1, d.x2 - d.x1, d.y2 - d.y1);
+            ctx.setLineDash([]);
             const cls = d.class_name || ('#' + (d.class_id != null ? d.class_id : '?'));
             if (gdt) {
                 // Draw a DIMENSION ARROW LINE on the measured side (vertical=height, horizontal=width/diameter).
@@ -597,10 +627,17 @@ function drawBoxes(ctx, result, cvWidth) {
             } else {
                 const conf = (typeof d.confidence === 'number') ? ` ${Math.round(d.confidence * 100)}%` : '';
                 const model = s.modelName || s.label || '';
-                const lab = rich ? `${model}${addon ? ' · ' + addon : ''} · ${cls}${conf}` : `${cls}${conf}`;
+                const hasColor = (s.addons || []).includes('Color Inspection') || (s.checks || []).some(c => c.addon === 'Color Inspection');
+                let extra = '';
+                if (d.areaMM2 != null) extra += ` ${d.areaMM2.toFixed(1)}mm²`;
+                else if (d.areaPx != null) extra += ` ${d.areaPx}px`;
+                if (hasColor && d.contrast != null) extra += ` Δ${Math.round(d.contrast)}`;
+                if (isMarked) extra += ' [GOOD]';
+                else if (isSub) extra += ' (noise)';
+                const lab = rich ? `${model}${addon ? ' · ' + addon : ''} · ${cls}${conf}${extra}` : `${cls}${conf}${extra}`;
                 const tw = ctx.measureText(lab).width;
                 const ly = Math.max(0, d.y1 - fs - 5);
-                ctx.fillStyle = baseCol; ctx.fillRect(d.x1, ly, tw + 10, fs + 5);
+                ctx.fillStyle = boxCol; ctx.fillRect(d.x1, ly, tw + 10, fs + 5);
                 ctx.fillStyle = '#fff'; ctx.fillText(lab, d.x1 + 5, ly + 2);
             }
         });
@@ -666,6 +703,9 @@ function renderResult(result, dataUrl) {
             logEvent(`Pin <strong style="color:#ef4444">GAGAL</strong> — ${esc(result.pinout.alasan || '')}`, 'ng');
         }
     }
+    if (result.learningMode) {
+        logEvent(`🎓 Sinyal reject hardware <strong>ditekan</strong> (Mode Belajar)`, 'sig');
+    }
     lastFull = result;   // hasil penuh (Capture manual) → bisa dipakai Tuning GD&T
     if (live) drawLiveOverlay(result); else drawOverlay(result, dataUrl);
 
@@ -679,6 +719,116 @@ function renderResult(result, dataUrl) {
     updateCountersDOM();
 }
 
+function isLearningMode() {
+    const el = document.getElementById('learningToggle');
+    return el ? el.checked : false;
+}
+
+function onToggleLearning() {
+    const active = isLearningMode();
+    const banner = document.getElementById('learningBanner');
+    if (banner) banner.style.display = active ? 'block' : 'none';
+    logEvent(active
+        ? '🎓 Mode Belajar AKTIF — sinyal reject hardware ditekan'
+        : '🎓 Mode Belajar NONAKTIF — sinyal reject normal', 'sig');
+}
+
+function relearnBatchSize() {
+    const el = document.getElementById('batchRelearnSize');
+    return (el && parseInt(el.value)) || 10;
+}
+
+let currentReviewDets = [];
+
+function renderFlaggedDetections(result) {
+    const listEl = document.getElementById('flaggedDetsList');
+    const badgeEl = document.getElementById('relearnBatchBadge');
+    if (!listEl) return;
+    currentReviewDets = [];
+
+    (result.steps || []).forEach(s => {
+        const isInsp = s.category === 'Inspection' || (s.detections && s.detections.length > 0);
+        if (!isInsp) return;
+        const hasColor = (s.addons || []).includes('Color Inspection') || (s.checks || []).some(c => c.addon === 'Color Inspection');
+        (s.detections || []).forEach((d, dIdx) => {
+            if (d.x1 == null) return;
+            currentReviewDets.push({
+                stepIndex: s.stepIndex,
+                modelName: s.modelName,
+                hasColor,
+                detIndex: dIdx,
+                det: d
+            });
+        });
+    });
+
+    const bSize = relearnBatchSize();
+    if (badgeEl) badgeEl.textContent = `Batch: ${bSize}`;
+
+    if (!currentReviewDets.length) {
+        listEl.innerHTML = '<span class="muted">Belum ada deteksi untuk direview</span>';
+        return;
+    }
+
+    listEl.innerHTML = currentReviewDets.map(item => {
+        const d = item.det;
+        const cls = d.class_name || ('#' + (d.class_id != null ? d.class_id : '?'));
+        const conf = typeof d.confidence === 'number' ? (d.confidence * 100).toFixed(0) + '%' : '-';
+        const area = d.areaMM2 != null ? `${d.areaMM2.toFixed(2)} mm²` : (d.areaPx != null ? `${d.areaPx} px` : '-');
+        const contrastPart = item.hasColor && d.contrast != null ? ` · Δ${d.contrast.toFixed(1)}` : '';
+
+        let actionHtml = '';
+        if (d.markedGood) {
+            actionHtml = '<span style="color:#22c55e;font-weight:700;font-size:11px">✓ Good</span>';
+        } else if (d.subThreshold) {
+            actionHtml = '<span class="muted" style="font-size:10px">Sub-threshold</span>';
+        } else {
+            actionHtml = `<button class="btn small" style="padding:2px 6px;font-size:10px;background:#3b82f6;color:#fff" onclick="markDetectionGood(${item.stepIndex}, ${item.detIndex})">✓ Mark as Good</button>`;
+        }
+
+        return `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;border-bottom:1px solid var(--border);gap:4px">
+                <div style="flex:1;min-width:0">
+                    <strong style="font-size:11px">${esc(cls)}</strong> 
+                    <span class="muted" style="font-size:10px">${conf} · ${area}${contrastPart}</span>
+                </div>
+                <div style="flex:0 0 auto">${actionHtml}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function markDetectionGood(stepIndex, detIndex) {
+    const item = currentReviewDets.find(x => x.stepIndex === stepIndex && x.detIndex === detIndex);
+    if (!item) return;
+    const d = item.det;
+    const bSize = relearnBatchSize();
+    const sample = {
+        className: d.class_name || ('#' + d.class_id),
+        confidence: d.confidence,
+        areaMM2: d.areaMM2,
+        areaPx: d.areaPx,
+        contrast: item.hasColor ? d.contrast : undefined
+    };
+    try {
+        const res = await window.api.markGood(projectName, item.modelName, sample, bSize);
+        d.markedGood = true;
+        logEvent(`Relearn: sampel '${sample.className}' ditandai Good (${res.buffered}/${res.batchSize})`, 'sig');
+        if (res.updated) {
+            const adj = (res.thresholds && res.thresholds[sample.className]) || {};
+            const contPart = item.hasColor && adj.minContrast != null ? `, minContrast=${adj.minContrast}` : '';
+            logEvent(`🎯 Baseline terupdate otomatis untuk '${sample.className}': minConf=${adj.minConfidence || '-'}, minArea=${adj.minAreaMM2 || '-'}mm²${contPart}`, 'ok');
+            pesan(`✓ Baseline diperbarui otomatis untuk kelas ${sample.className}!`, 'ok');
+        }
+        if (lastFull) {
+            renderFlaggedDetections(lastFull);
+            if (!live) drawOverlay(lastFull, lastDataUrl);
+        }
+    } catch (e) {
+        pesan('Gagal menandai Good: ' + e.message, 'err');
+    }
+}
+
 // Tabel step + palette + notifikasi self-learning.
 function renderStepsAndSL(result) {
     document.getElementById('stepRows').innerHTML = result.steps.map(s => `
@@ -690,7 +840,7 @@ function renderStepsAndSL(result) {
         </tr>
     `).join('') || '<tr><td colspan="4" class="muted">Belum ada hasil</td></tr>';
     renderPalette(result);
-
+    renderFlaggedDetections(result);
 }
 
 function resetCounters() {
@@ -855,7 +1005,7 @@ async function inspectPart(dataUrl, confVal, force) {
     let full = lastLite || { steps: [], finalVerdict: 'OK' };
     const mImg = parseInt((document.getElementById('measImgsz') || {}).value);
     const measBox = !!(document.getElementById('measBox') && document.getElementById('measBox').checked);
-    try { full = await window.api.inspect(projectName, mframe, { confidence: confVal, light: false, noSignal: true, noSave: true, imgsz: isNaN(mImg) ? undefined : mImg, measureFromBox: measBox }); }
+    try { full = await window.api.inspect(projectName, mframe, { confidence: confVal, light: false, noSignal: true, noSave: true, imgsz: isNaN(mImg) ? undefined : mImg, measureFromBox: measBox, learningMode: isLearningMode() }); }
     catch (_) { }
     const inspStep = (full.steps || []).find(s => s.category === 'Inspection' && !s.skipped);
     // Langsung tampilkan overlay & finalize — tanpa logika "menunggu fitur lengkap".

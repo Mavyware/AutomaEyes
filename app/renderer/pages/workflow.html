@@ -187,6 +187,9 @@ function renderProps() {
         }
         const pass = (s.config && s.config.passOnNoDetect) ? 'checked' : '';
         configHtml = verHtml + `<label style="display:block;margin-bottom:6px"><input type="checkbox" ${pass} onchange="updateStepConfig('passOnNoDetect', this.checked)"> Anggap <strong>OK</strong> bila tidak ada objek terdeteksi (lanjut ke step berikutnya)</label>`;
+        if (s.category === 'Inspection') {
+            configHtml += renderPerClassThresholds(s, m);
+        }
     } else {
         head = `<h3>Step [${selectedIdx + 1}] — ${esc(s.label || s.tool)}</h3>
             <p class="muted">Tool ${esc(s.category)}.</p>`;
@@ -245,6 +248,78 @@ function updateStepConfig(key, value) {
     const s = steps[selectedIdx];
     s.config = s.config || {};
     s.config[key] = value;
+}
+
+function renderPerClassThresholds(s, m) {
+    if (!m || !m.classes || !m.classes.length) return '';
+    const hasColor = m && (m.addons || []).includes('Color Inspection');
+    const isCls = m && m.type === 'AI Classification';
+    const current = (s.config && s.config.perClassThresholds) || {};
+    const modelDef = m.perClassThresholds || {};
+
+    const rows = m.classes.map(cls => {
+        const cfg = current[cls] || {};
+        const def = modelDef[cls] || {};
+        const confVal = cfg.minConfidence != null ? cfg.minConfidence : (def.minConfidence != null ? def.minConfidence : '');
+        const areaVal = cfg.minAreaMM2 != null ? cfg.minAreaMM2 : (def.minAreaMM2 != null ? def.minAreaMM2 : '');
+        const contVal = cfg.minContrast != null ? cfg.minContrast : (def.minContrast != null ? def.minContrast : '');
+
+        return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="font-weight:600;font-size:11px;padding:4px">${esc(cls)}</td>
+            <td style="padding:4px">
+                <input type="number" step="0.05" min="0.05" max="0.95" placeholder="${def.minConfidence != null ? def.minConfidence : '0.25'}" value="${confVal}" 
+                    style="width:55px;padding:2px;font-size:11px"
+                    onchange="updateClassThreshold('${esc(cls)}', 'minConfidence', this.value)">
+            </td>
+            ${!isCls ? `
+            <td style="padding:4px">
+                <input type="number" step="0.1" min="0" placeholder="${def.minAreaMM2 != null ? def.minAreaMM2 : '0'}" value="${areaVal}" 
+                    style="width:55px;padding:2px;font-size:11px"
+                    onchange="updateClassThreshold('${esc(cls)}', 'minAreaMM2', this.value)">
+            </td>` : ''}
+            ${hasColor ? `
+            <td style="padding:4px">
+                <input type="number" step="1" min="0" max="255" placeholder="${def.minContrast != null ? def.minContrast : '0'}" value="${contVal}" 
+                    style="width:55px;padding:2px;font-size:11px"
+                    onchange="updateClassThreshold('${esc(cls)}', 'minContrast', this.value)">
+            </td>` : ''}
+        </tr>`;
+    }).join('');
+
+    return `
+        <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+            <h4 style="margin:0 0 4px;font-size:12px">🎯 Ambang Cacat Per-Kelas</h4>
+            <p class="muted" style="font-size:10px;margin:0 0 6px">Deteksi cacat di bawah batas ini disaring sebagai noise/sub-threshold (tidak memicu NG).</p>
+            <table style="width:100%;border-collapse:collapse">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border);font-size:10px;color:var(--muted)">
+                        <th style="text-align:left;padding:2px 4px">Kelas</th>
+                        <th style="text-align:left;padding:2px 4px">Min Conf</th>
+                        ${!isCls ? '<th style="text-align:left;padding:2px 4px">Min Area (mm²)</th>' : ''}
+                        ${hasColor ? '<th style="text-align:left;padding:2px 4px">Min Contrast</th>' : ''}
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+function updateClassThreshold(cls, field, val) {
+    adaPerubahan = true;
+    if (selectedIdx < 0) return;
+    const s = steps[selectedIdx];
+    s.config = s.config || {};
+    s.config.perClassThresholds = s.config.perClassThresholds || {};
+    s.config.perClassThresholds[cls] = s.config.perClassThresholds[cls] || {};
+    if (val === '' || val == null) {
+        delete s.config.perClassThresholds[cls][field];
+        if (Object.keys(s.config.perClassThresholds[cls]).length === 0) {
+            delete s.config.perClassThresholds[cls];
+        }
+    } else {
+        s.config.perClassThresholds[cls][field] = parseFloat(val);
+    }
 }
 
 // Modal-based step picker (prompt() is NOT supported in Electron).

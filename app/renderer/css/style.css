@@ -700,7 +700,7 @@ textarea { resize: vertical; }
 
 /* ================== DIALOG YA / TIDAK ================== */
 .tanya-latar {
-    position: fixed; inset: 0; z-index: 4200;
+    position: fixed; inset: 0; z-index: 10000;
     background: rgba(16, 24, 40, .5);
     display: flex; align-items: center; justify-content: center; padding: 16px;
 }
