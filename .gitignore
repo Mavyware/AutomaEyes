@@ -58,3 +58,4 @@ app/tests/**/jejak.json
 # Local agent skills and workspace configs
 .agents/
 .playwright-cli/
+.codegraph/
