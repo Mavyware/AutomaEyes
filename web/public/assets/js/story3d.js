@@ -192,6 +192,18 @@ function init() {
 
   const railItems = Array.prototype.slice.call(document.querySelectorAll('.story3d-rail .item'));
   const allOverlays = Array.prototype.slice.call(document.querySelectorAll('.story3d .overlay'));
+
+  railItems.forEach((item) => {
+    item.addEventListener('click', () => {
+      const idx = Number(item.dataset.i);
+      const total = storyEl.offsetHeight - window.innerHeight;
+      const top = storyEl.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({
+        top: top + ((idx + 0.4) / 5) * total,
+        behavior: 'smooth'
+      });
+    });
+  });
   const overlaysByStage = {
     0: [],
     1: ['ov-frame'],
