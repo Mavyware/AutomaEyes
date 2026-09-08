@@ -205,16 +205,7 @@ function init() {
   const ovOutput = document.getElementById('ov-output');
 
   let lastStage = -1;
-  railItems.forEach((item) => {
-    item.style.cursor = 'pointer';
-    item.addEventListener('click', () => {
-      const idx = Number(item.dataset.i);
-      const total = storyEl.offsetHeight - window.innerHeight;
-      const top = storyEl.getBoundingClientRect().top + window.scrollY;
-      const targetP = (idx + 0.15) / camKeys.length;
-      window.scrollTo({ top: top + targetP * total, behavior: 'smooth' });
-    });
-  });
+  let currentStage = 0;
 
   function setStageVisuals(stageIndex) {
     railItems.forEach((item) => {
