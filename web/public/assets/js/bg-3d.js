@@ -1,10 +1,9 @@
 /**
  * AutomaEyes 3D Background Engine
- * High-performance Three.js WebGL industrial visualizer:
- * - Dynamic undulating inspection terrain grid
- * - Floating 3D telecentric lens & precision workpiece wireframes
- * - Sweeping industrial laser inspection plane
- * - Reactive mouse parallax & scroll-driven spatial depth
+ * Scroll-Driven Three.js WebGL Industrial Visualizer:
+ * - 3D movement and transformations are physically driven by user scroll progress
+ * - No infinite repeating loops: each scroll gesture advances the 3D scene
+ * - Interactive mouse parallax perspective
  */
 import * as THREE from 'three';
 
@@ -26,9 +25,10 @@ import * as THREE from 'three';
 
   var mouseX = 0, mouseY = 0;
   var targetCamX = 0, targetCamY = 6;
-  var scrollY = 0;
+  var currentScroll = 0;
+  var targetScroll = 0;
+  var maxScroll = 1;
   var isRunning = true;
-  var clock = new THREE.Clock();
 
   var ACCENT_CYAN = 0x00f0c0;
   var ACCENT_PURPLE = 0x7c5cff;
@@ -99,7 +99,7 @@ import * as THREE from 'three';
     gridPoints = new THREE.Points(gridGeo, pMat);
     gridMesh.add(gridPoints);
 
-    /* ---------- 2. Sweeping Industrial Laser Plane ---------- */
+    /* ---------- 2. Scroll-Linked Industrial Laser Plane ---------- */
     var laserGeo = new THREE.PlaneGeometry(70, 0.35);
     var laserMat = new THREE.MeshBasicMaterial({
       color: ACCENT_CYAN,
@@ -109,7 +109,7 @@ import * as THREE from 'three';
     });
     laserBeam = new THREE.Mesh(laserGeo, laserMat);
     laserBeam.rotation.x = -Math.PI / 2.25;
-    laserBeam.position.set(0, -6.4, 0);
+    laserBeam.position.set(0, -6.4, -14);
     scene.add(laserBeam);
 
     // Laser glow wash
@@ -123,10 +123,10 @@ import * as THREE from 'three';
     });
     laserGlow = new THREE.Mesh(glowGeo, glowMat);
     laserGlow.rotation.x = -Math.PI / 2.25;
-    laserGlow.position.set(0, -6.4, 0);
+    laserGlow.position.set(0, -6.4, -14);
     scene.add(laserGlow);
 
-    /* ---------- 3. Floating 3D Industrial Lens (Left) ---------- */
+    /* ---------- 3. Telecentric Inspection Lens (Left) ---------- */
     lensGroup = new THREE.Group();
     lensGroup.position.set(-10.5, 3.5, 3);
     scene.add(lensGroup);
@@ -164,7 +164,7 @@ import * as THREE from 'three';
     rayCone.position.set(0, -3.2, 3.2);
     lensGroup.add(rayCone);
 
-    /* ---------- 4. Floating Precision SMT Workpiece (Right) ---------- */
+    /* ---------- 4. Precision SMT Workpiece (Right) ---------- */
     chipGroup = new THREE.Group();
     chipGroup.position.set(10.5, 2.8, 1);
     scene.add(chipGroup);
@@ -202,7 +202,7 @@ import * as THREE from 'three';
     chipBox.material.opacity = 0.45;
     chipGroup.add(chipBox);
 
-    /* ---------- 5. Center Floating Telemetry Reticle (Depth) ---------- */
+    /* ---------- 5. Center Telemetry Reticle (Depth) ---------- */
     reticleGroup = new THREE.Group();
     reticleGroup.position.set(0, 7.5, -6);
     scene.add(reticleGroup);
@@ -260,9 +260,9 @@ import * as THREE from 'three';
     window.addEventListener('scroll', onScroll, { passive: true });
     document.addEventListener('visibilitychange', function () {
       isRunning = !document.hidden;
-      if (isRunning) clock.getDelta();
     });
 
+    onScroll();
     animate();
   }
 
@@ -281,7 +281,8 @@ import * as THREE from 'three';
   }
 
   function onScroll() {
-    scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    targetScroll = window.pageYOffset || document.documentElement.scrollTop;
   }
 
   function onResize() {
@@ -291,57 +292,60 @@ import * as THREE from 'three';
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
     renderer.setSize(W, H, false);
+    onScroll();
   }
 
   function animate() {
     requestAnimationFrame(animate);
     if (!isRunning) return;
 
-    var t = clock.getElapsedTime();
+    // Smooth lerp damping for scroll: animations progress WITH user scroll
+    currentScroll += (targetScroll - currentScroll) * 0.08;
+    var sp = Math.max(0, Math.min(1, currentScroll / maxScroll));
 
     if (!reduced) {
-      // 1. Undulating terrain wave calculation
+      // 1. Undulating terrain wave: phase is physically driven by scroll progress
       var posArray = posAttr.array;
+      var wavePhase = sp * Math.PI * 4.5;
       for (var i = 0; i < posArray.length; i += 3) {
         var vx = posArray[i];
         var vy = posArray[i + 1];
-        // Dynamic wave interference formula
-        posArray[i + 2] = Math.sin(vx * 0.18 + t * 1.4) * Math.cos(vy * 0.18 + t * 1.1) * 1.35
-          + Math.sin((vx + vy) * 0.1 + t * 0.7) * 0.6;
+        posArray[i + 2] = Math.sin(vx * 0.18 + wavePhase) * Math.cos(vy * 0.18 + wavePhase * 0.75) * 1.5;
       }
       posAttr.needsUpdate = true;
 
-      // 2. Sweeping Laser Plane motion
-      var laserZ = Math.sin(t * 0.75) * 16 - 4;
+      // 2. Industrial Laser Plane: sweeps across the grid as user scrolls from top to bottom
+      var laserZ = -14 + sp * 28;
       laserBeam.position.z = laserZ;
       laserGlow.position.z = laserZ;
-      laserBeam.material.opacity = 0.7 + 0.3 * Math.sin(t * 3.5);
 
-      // 3. Floating Lens motion (Left)
-      lensGroup.position.y = 3.5 + Math.sin(t * 0.9) * 0.45;
-      lensGroup.rotation.y = Math.sin(t * 0.5) * 0.35;
-      lensGroup.rotation.z = Math.cos(t * 0.4) * 0.15;
+      // 3. Telecentric Lens (Left): rotates and tilts proportionally to scroll
+      lensGroup.position.x = -10.5 + sp * 2.5;
+      lensGroup.position.y = 3.5 - sp * 1.8;
+      lensGroup.rotation.y = sp * Math.PI * 1.6;
+      lensGroup.rotation.z = Math.sin(sp * Math.PI) * 0.32;
 
-      // 4. Floating SMT Workpiece motion (Right)
-      chipGroup.position.y = 2.8 + Math.sin(t * 0.8 + 1.2) * 0.4;
-      chipGroup.rotation.y = t * 0.32;
-      chipGroup.rotation.x = Math.sin(t * 0.5) * 0.22;
+      // 4. Precision SMT Workpiece (Right): spins 360 degrees as user scrolls through page
+      chipGroup.position.x = 10.5 - sp * 2.0;
+      chipGroup.position.y = 2.8 - sp * 1.5;
+      chipGroup.rotation.y = sp * Math.PI * 2.2;
+      chipGroup.rotation.x = 0.2 + Math.sin(sp * Math.PI) * 0.38;
 
-      // 5. Reticle rotation (Depth)
-      reticleGroup.rotation.z = t * 0.08;
-      reticleGroup.position.y = 7.5 + Math.sin(t * 0.6) * 0.3;
+      // 5. Reticle rotation & depth zoom
+      reticleGroup.rotation.z = sp * Math.PI * 2;
+      reticleGroup.scale.setScalar(Math.max(0.65, 1 - sp * 0.35));
 
-      // 6. Particle drift
-      particles.rotation.y = t * 0.035;
-      particles.rotation.x = Math.sin(t * 0.02) * 0.05;
+      // 6. Particle cloud: advances along Z axis with scroll depth
+      particles.position.z = sp * 22;
+      particles.rotation.y = sp * 0.6;
 
-      // 7. Parallax camera damping with mouse and scroll
+      // 7. Parallax camera tracking: smooth mouse perspective + scroll depth
       targetCamX = mouseX * 3.2;
-      targetCamY = 6 - mouseY * 2.2 - scrollY * 0.003;
-      camera.position.x += (targetCamX - camera.position.x) * 0.05;
-      camera.position.y += (targetCamY - camera.position.y) * 0.05;
-      camera.position.z = 24 + scrollY * 0.004;
-      camera.lookAt(0, 2 - scrollY * 0.003, 0);
+      targetCamY = 6 - mouseY * 2.0 - sp * 4.5;
+      camera.position.x += (targetCamX - camera.position.x) * 0.06;
+      camera.position.y += (targetCamY - camera.position.y) * 0.06;
+      camera.position.z = 24 - sp * 6;
+      camera.lookAt(0, 2 - sp * 3.5, 0);
     }
 
     renderer.render(scene, camera);

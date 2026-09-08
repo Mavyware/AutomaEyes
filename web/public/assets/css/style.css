@@ -509,20 +509,15 @@ section[id] {
 .sim-laser-sweep {
   position: absolute;
   left: 0;
+  top: var(--laser-y, 50%);
   width: 100%;
   height: 2px;
   background: linear-gradient(90deg, transparent 0%, rgba(0, 240, 192, 0.4) 15%, #ffffff 50%, rgba(0, 240, 192, 0.4) 85%, transparent 100%);
   box-shadow: 0 0 12px #00f0c0, 0 0 24px rgba(0, 240, 192, 0.7);
   pointer-events: none;
   z-index: 10;
-  animation: laserSweep 3s ease-in-out infinite;
-}
-@keyframes laserSweep {
-  0% { top: 20px; opacity: 0.15; }
-  12% { opacity: 0.95; }
-  50% { top: calc(100% - 20px); opacity: 0.95; }
-  88% { opacity: 0.95; }
-  100% { top: 20px; opacity: 0.15; }
+  opacity: var(--laser-opacity, 0.85);
+  transition: opacity 0.2s ease;
 }
 
 #demo-canvas {

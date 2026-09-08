@@ -419,8 +419,22 @@
 
     var animFrameId = null;
     var isLooping = false;
-    var startTime = performance.now();
-    var chevronFrames = ['>>> >>> >>>', ' >> >>> >>>', '  > >>> >>>', '>  > >>> >>'];
+    var demoSection = document.getElementById('demo');
+    var targetScanPos = 0.5;
+    var currentScanPos = 0.5;
+    var isHoveringCanvas = false;
+    var mouseScanY = 0.5;
+
+    function onScrollProgress() {
+      if (!demoSection) return;
+      var rect = demoSection.getBoundingClientRect();
+      var windowH = window.innerHeight;
+      // Normalized progress: 0 when top reaches bottom of screen, 1 when bottom leaves top
+      var progress = (windowH * 0.75 - rect.top) / (rect.height * 0.9);
+      targetScanPos = 0.12 + Math.max(0, Math.min(1, progress)) * 0.76;
+    }
+    window.addEventListener('scroll', onScrollProgress, { passive: true });
+    onScrollProgress();
 
     function resize() {
       var rect = canvas.getBoundingClientRect();
@@ -428,10 +442,9 @@
       canvas.height = rect.height * dpr;
     }
 
-    function render(time) {
+    function render() {
       var W = canvas.width;
       var H = canvas.height;
-      var t = (time - startTime) * 0.001;
 
       ctx.save();
       ctx.clearRect(0, 0, W, H);
@@ -449,9 +462,8 @@
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
       }
 
-      // Camera Crosshair Overlay with subtle breathing
-      var crosshairAlpha = 0.14 + 0.06 * Math.sin(t * 2);
-      ctx.strokeStyle = 'rgba(0, 240, 192, ' + crosshairAlpha + ')';
+      // Camera Crosshair Overlay
+      ctx.strokeStyle = 'rgba(0, 240, 192, 0.18)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(W / 2, 20 * dpr); ctx.lineTo(W / 2, H - 20 * dpr);
@@ -464,9 +476,16 @@
         part.render(ctx, W, H, isNg, showMask, showGdt);
       }
 
-      // Continuous Industrial Laser Scanner Sweep
-      var scanPos = Math.sin(t * 1.8) * 0.5 + 0.5;
-      var scanY = 24 * dpr + scanPos * (H - 48 * dpr);
+      // Scroll & Hover Driven Laser Scanner Position (No endless auto-loops!)
+      var target = isHoveringCanvas ? mouseScanY : targetScanPos;
+      currentScanPos += (target - currentScanPos) * 0.14;
+      var scanY = 20 * dpr + currentScanPos * (H - 40 * dpr);
+
+      // Update DOM overlay laser line position with CSS variable
+      var sweepEl = document.querySelector('.sim-laser-sweep');
+      if (sweepEl) {
+        sweepEl.style.setProperty('--laser-y', (currentScanPos * 100).toFixed(1) + '%');
+      }
 
       ctx.save();
       ctx.strokeStyle = '#00f0c0';
@@ -525,16 +544,16 @@
       ctx.fillText('ONNX TENSORRT ACCELERATED // ZERO JITTER ENVELOPE // 120 FPS', 16 * dpr, H - 16 * dpr);
 
       ctx.restore();
-      updateTelemetry(t);
+      updateTelemetry();
     }
 
-    function loop(time) {
+    function loop() {
       if (!isLooping) return;
-      render(time);
+      render();
       animFrameId = requestAnimationFrame(loop);
     }
 
-    function updateTelemetry(t) {
+    function updateTelemetry() {
       var part = PARTS[currentPartKey];
       var stats = isNg ? part.ngStats : part.okStats;
 
@@ -554,12 +573,11 @@
           plcStatus.innerHTML = '<span class="conveyor-track" style="color:#ff5d6c;">[PULSE 120MS]</span> SOLENOID ENERGIZED &rarr; REJECT ACTUATED';
           plcStatus.className = 'plc-status-text plc-active';
         } else {
-          var chv = chevronFrames[Math.floor(t * 3.5) % chevronFrames.length];
           if (isNg) {
             plcStatus.innerHTML = '<span class="conveyor-track" style="color:#ff4466;">[REJECT READY]</span> COIL 0003 ARMED &rarr; REJECT ON TRIGGER';
             plcStatus.className = 'plc-status-text';
           } else {
-            plcStatus.innerHTML = '<span class="conveyor-track">' + chv + '</span> LINE ADVANCING &rarr; CONVEYOR RUN';
+            plcStatus.innerHTML = '<span class="conveyor-track">&gt;&gt;&gt;</span> LINE ADVANCING &rarr; CONVEYOR RUN';
             plcStatus.className = 'plc-status-text';
           }
         }
@@ -615,11 +633,19 @@
       });
     }
 
-    // Reticle Mouse Coordinate Tracking
+    // Interactive Canvas Mouse Scrubbing
+    canvas.addEventListener('mouseenter', function () {
+      isHoveringCanvas = true;
+    });
+    canvas.addEventListener('mouseleave', function () {
+      isHoveringCanvas = false;
+    });
     canvas.addEventListener('mousemove', function (e) {
+      isHoveringCanvas = true;
       var rect = canvas.getBoundingClientRect();
+      mouseScanY = Math.max(0.08, Math.min(0.92, (e.clientY - rect.top) / rect.height));
       var px = ((e.clientX - rect.left) / rect.width) * 680;
-      var py = ((e.clientY - rect.top) / rect.height) * 420;
+      var py = mouseScanY * 420;
       var reticleEl = document.querySelector('.reticle-coords');
       if (reticleEl) {
         reticleEl.textContent = 'RETICLE: X: ' + px.toFixed(2) + ' Y: ' + py.toFixed(2) + ' · GAIN: 2.4 dB';
@@ -638,7 +664,7 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // IntersectionObserver for 60fps performance optimization
+    // IntersectionObserver for performance
     var observer = new IntersectionObserver(function (entries) {
       var visible = entries[0].isIntersecting;
       if (visible && !isLooping) {
@@ -648,7 +674,7 @@
         isLooping = false;
         if (animFrameId) cancelAnimationFrame(animFrameId);
       }
-    }, { threshold: 0.1 });
+    }, { threshold: 0.05 });
     observer.observe(canvas);
   }
 
