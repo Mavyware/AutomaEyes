@@ -19,12 +19,12 @@
     "check": "node scripts/check.js"
   },
   "devDependencies": {
-    "electron": "^44.2.0",
+    "electron": "^44.4.1",
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
-    "adm-zip": "^0.6.0",
-    "js-yaml": "^5.4.1",
+    "adm-zip": "^0.6.1",
+    "js-yaml": "^5.4.2",
     "serialport": "^13.0.0"
   },
   "allowScripts": {
